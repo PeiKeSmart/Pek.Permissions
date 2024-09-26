@@ -4,6 +4,9 @@ using System.Text;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 
+using NewLife;
+using NewLife.Web;
+
 using Pek;
 using Pek.Exceptions;
 using Pek.Helpers;
@@ -64,6 +67,12 @@ internal sealed class JsonWebTokenBuilder : IJsonWebTokenBuilder
     /// 创建令牌
     /// </summary>
     /// <param name="payload">负载</param>
+    public JsonWebToken Create1(IDictionary<string, string> payload) => Create1(payload, _options);
+
+    /// <summary>
+    /// 创建令牌
+    /// </summary>
+    /// <param name="payload">负载</param>
     /// <param name="AccessExpireMinutes">访问令牌有效期分钟数</param>
     /// <param name="RefreshExpireMinutes">刷新令牌有效期分钟数</param>
     public JsonWebToken Create(IDictionary<string, string> payload, Double RefreshExpireMinutes, Double AccessExpireMinutes = 0)
@@ -119,6 +128,74 @@ internal sealed class JsonWebTokenBuilder : IJsonWebTokenBuilder
             AccessToken = token,
             AccessTokenUtcExpires = Conv.To<long>(accessExpires.ToJsGetTime()),
             RefreshToken = refreshTokenStr,
+            RefreshUtcExpires = Conv.To<long>(refreshExpires.ToJsGetTime())
+        };
+        _tokenStore.SaveToken(accessToken, accessExpires);
+
+        // 绑定用户设备令牌
+        _tokenStore.BindUserDeviceToken(userId, clientType, new DeviceTokenBindInfo()
+        {
+            UserId = userId,
+            DeviceId = clientId,
+            DeviceType = clientType,
+            Token = accessToken,
+        }, refreshExpires);
+        // 存储payload
+        _tokenPayloadStore.Save(refreshToken, payload, refreshExpires);
+        _tokenPayloadStore.Save(token, payload, accessExpires);
+        return accessToken;
+    }
+
+    /// <summary>
+    /// 创建令牌
+    /// </summary>
+    /// <param name="payload">负载</param>
+    /// <param name="options">Jwt选项配置</param>
+    public JsonWebToken Create1(IDictionary<string, string> payload, JwtOptions options)
+    {
+        if (options.Secret.IsNullOrWhiteSpace())
+            throw new ArgumentNullException(nameof(options.Secret),
+                $@"{nameof(options.Secret)}为Null或空字符串。请在""appsettings.json""配置""{nameof(JwtOptions)}""节点及其子节点""{nameof(JwtOptions.Secret)}""");
+        var clientId = payload.ContainsKey("clientId") ? payload["clientId"] : Guid.NewGuid().ToString();
+        var clientType = payload.ContainsKey("clientType") ? payload["clientType"] : "admin";
+        var userId = GetUserId(payload);
+        if (userId.IsEmpty())
+            throw new ArgumentException("不存在用户标识");
+        var claims = Helper.ToClaims(payload);
+
+        var ss = options.Secret.Split(':');
+        var jwt = new JwtBuilder
+        {
+            Issuer = options.Issuer,
+            Subject = userId,
+            Id = userId,
+
+            Algorithm = ss[0],
+            Secret = ss[1],
+        };
+
+        jwt.Expire = DateTime.Now.AddMinutes(options.RefreshExpireMinutes);
+        var refreshToken = jwt.Encode(payload);
+        var refreshExpires = jwt.Expire;
+
+        // 生成刷新令牌
+        _tokenStore.SaveRefreshToken(new RefreshToken()
+        {
+            ClientId = clientId,
+            EndUtcTime = refreshExpires,
+            Value = refreshToken
+        });
+
+        jwt.Expire = DateTime.Now.AddMinutes(options.AccessExpireMinutes);
+        var token = jwt.Encode(payload);
+        var accessExpires = jwt.Expire;
+
+        // 生成访问令牌
+        var accessToken = new JsonWebToken()
+        {
+            AccessToken = token,
+            AccessTokenUtcExpires = Conv.To<long>(accessExpires.ToJsGetTime()),
+            RefreshToken = refreshToken,
             RefreshUtcExpires = Conv.To<long>(refreshExpires.ToJsGetTime())
         };
         _tokenStore.SaveToken(accessToken, accessExpires);

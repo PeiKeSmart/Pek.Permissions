@@ -34,7 +34,16 @@ internal class Program
         s = DecodeTokenWithError(token2?.AccessToken!, JwtSecret);
         XTrace.WriteLine($"获取到的数据1：{s.Item1.Subject}");
 
+        JwtSecret = "HS256:qyzgLoRi9PvsWyMDllQoCIQsxM";
+        var token1 = "eyJhbGciOiJIUzI1NiJ9.eyJjbGllbnRJZCI6IjEiLCJodHRwOi8vc2NoZW1hcy54bWxzb2FwLm9yZy93cy8yMDA1LzA1L2lkZW50aXR5L2NsYWltcy9zaWQiOiIxIiwiaHR0cDovL3NjaGVtYXMueG1sc29hcC5vcmcvd3MvMjAwNS8wNS9pZGVudGl0eS9jbGFpbXMvbmFtZWlkZW50aWZpZXIiOiJhZG1pbiIsImlzcyI6ImRpbmdfaWRlbnRpdHkiLCJzdWIiOiIxIiwiZXhwIjoxNzI3MzI1MzUxLCJpYXQiOjE3MjczMTgxNTEsImp0aSI6IjEifQ.ZZWVBbOqYTpJNoE7aHgmrlrwmLJbm2Owv2B1U4oow08";
+        s = DecodeTokenWithError(token1, JwtSecret);
 
+        foreach (var item in s.Item1.Items)
+        {
+            XTrace.WriteLine($"获取到的数据2：{item.Key}:{item.Value}");
+        }
+
+        XTrace.WriteLine($"获取到的数据2：{s.Item1.Subject}");
     }
 
     /// <summary>颁发令牌</summary>

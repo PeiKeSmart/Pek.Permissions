@@ -1,10 +1,13 @@
-﻿using DH.Permissions.Identity.JwtBearer;
+﻿using System.Security.Claims;
+
+using DH.Permissions.Identity.JwtBearer;
 
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc.Filters;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 
+using NewLife.Log;
 using NewLife.Serialization;
 
 using Pek.Security;
@@ -72,6 +75,7 @@ public class JsonWebTokenAuthorizationHandler : AuthorizationHandler<JsonWebToke
     protected virtual void ThrowExceptionHandle(AuthorizationHandlerContext context,
         JsonWebTokenAuthorizationRequirement requirement)
     {
+        XTrace.WriteLine($"进来这里了么？ThrowExceptionHandle");
         var httpContext = (context.Resource as AuthorizationFilterContext)?.HttpContext;
         if (httpContext == null)
             return;
@@ -103,6 +107,7 @@ public class JsonWebTokenAuthorizationHandler : AuthorizationHandler<JsonWebToke
     protected virtual void ResultHandle(AuthorizationHandlerContext context,
         JsonWebTokenAuthorizationRequirement requirement)
     {
+        XTrace.WriteLine($"进来这里了么？ResultHandle");
         var httpContext = _accessor.HttpContext;
 
         if (httpContext == null)
@@ -112,26 +117,26 @@ public class JsonWebTokenAuthorizationHandler : AuthorizationHandler<JsonWebToke
 
         // 未登录而被拒绝
         var result = httpContext.Request.Headers.TryGetValue("Authorization", out var authorizationHeader);
-
-        if (!result || string.IsNullOrWhiteSpace(authorizationHeader))
+        XTrace.WriteLine($"进来这里了么1？ResultHandle");
+        if (!result || String.IsNullOrWhiteSpace(authorizationHeader))
         {
             context.Fail();
             return;
         }
-
+        XTrace.WriteLine($"进来这里了么2？ResultHandle");
         var token = authorizationHeader.ToString().Split(' ').Last().Trim();
         if (!_tokenStore.ExistsToken(token))
         {
             context.Fail();
             return;
         }
-
+        XTrace.WriteLine($"进来这里了么3？ResultHandle");
         if (!_tokenValidator.Validate(token, _options, requirement.ValidatePayload))
         {
             context.Fail();
             return;
         }
-
+        XTrace.WriteLine($"进来这里了么4？ResultHandle");
         // 登录超时
         var accessToken = _tokenStore.GetToken(token);
         if (accessToken.IsExpired())
@@ -139,7 +144,7 @@ public class JsonWebTokenAuthorizationHandler : AuthorizationHandler<JsonWebToke
             context.Fail();
             return;
         }
-
+        XTrace.WriteLine($"进来这里了么5？ResultHandle");
         var payload = GetPayload(token);
 
         // 单设备登录
@@ -152,11 +157,19 @@ public class JsonWebTokenAuthorizationHandler : AuthorizationHandler<JsonWebToke
                 return;
             }
         }
+        XTrace.WriteLine($"进来这里了么6？ResultHandle");
+
+        var claims = new List<Claim>
+        {
+            new Claim(ClaimTypes.Name, "exampleUser") // 替换为实际的用户名或其他声明
+            // 添加其他声明
+        };
+        httpContext.User = new ClaimsPrincipal(new ClaimsIdentity(claims, "CustomJwt"));
 
         var isAuthenticated = httpContext.User.Identity.IsAuthenticated;
         if (!isAuthenticated)
             return;
-
+        XTrace.WriteLine($"进来这里了么7？ResultHandle");
         httpContext.Items["clientId"] = payload["clientId"];
 
         context.Succeed(requirement);

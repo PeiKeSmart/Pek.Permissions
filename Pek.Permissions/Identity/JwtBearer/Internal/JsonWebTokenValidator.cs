@@ -1,10 +1,11 @@
-﻿using System.Security.Cryptography;
-using System.Text;
+﻿using System.Security.Claims;
 
 using Microsoft.IdentityModel.Tokens;
 
 using NewLife.Serialization;
+using NewLife.Web;
 
+using Pek.Helpers;
 using Pek.Security;
 
 namespace DH.Permissions.Identity.JwtBearer.Internal;
@@ -32,17 +33,30 @@ internal sealed class JsonWebTokenValidator : IJsonWebTokenValidator
         var payload = JsonHelper.ToJsonEntity<Dictionary<string, string>>(Base64UrlEncoder.Decode(jwtArray[1]));
 
         // 首先验证签名是否正确
-        var hs256 = new HMACSHA256(Encoding.UTF8.GetBytes(options.Secret));
-        var sign = Base64UrlEncoder.Encode(
-            hs256.ComputeHash(Encoding.UTF8.GetBytes(string.Concat(jwtArray[0], ".", jwtArray[1]))));
-        // 签名不正确直接返回
-        if (!string.Equals(jwtArray[2], sign))
+        var ss = options.Secret.Split(':');
+        var jwt = new JwtBuilder
+        {
+            Algorithm = ss[0],
+            Secret = ss[1],
+        };
+        if (!jwt.TryDecode(encodeJwt, out _))
             return false;
-        // 其次验证是否在有效期内
-        //var now = ToUnixEpochDate(DateTime.UtcNow);
-        //if (!(now >= long.Parse(payload["nbf"].ToString()) && now < long.Parse(payload["exp"].ToString())))
+
+        var claims = Helper.ToClaims(jwt.Items);
+        DHWeb.HttpContext.User = new ClaimsPrincipal(new ClaimsIdentity(claims, "jwt"));
+
+        //var hs256 = new HMACSHA256(Encoding.UTF8.GetBytes(options.Secret));
+        //var sign = Base64UrlEncoder.Encode(
+        //    hs256.ComputeHash(Encoding.UTF8.GetBytes(string.Concat(jwtArray[0], ".", jwtArray[1]))));
+        //// 签名不正确直接返回
+        //if (!string.Equals(jwtArray[2], sign))
         //    return false;
-        // 进行自定义验证
+        //// 其次验证是否在有效期内
+        ////var now = ToUnixEpochDate(DateTime.UtcNow);
+        ////if (!(now >= long.Parse(payload["nbf"].ToString()) && now < long.Parse(payload["exp"].ToString())))
+        ////    return false;
+        //// 进行自定义验证
+        
         return validatePayload(payload, options);
     }
 
