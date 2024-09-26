@@ -159,13 +159,6 @@ public class JsonWebTokenAuthorizationHandler : AuthorizationHandler<JsonWebToke
         }
         XTrace.WriteLine($"进来这里了么6？ResultHandle");
 
-        var claims = new List<Claim>
-        {
-            new Claim(ClaimTypes.Name, "exampleUser") // 替换为实际的用户名或其他声明
-            // 添加其他声明
-        };
-        httpContext.User = new ClaimsPrincipal(new ClaimsIdentity(claims, "CustomJwt"));
-
         var isAuthenticated = httpContext.User.Identity.IsAuthenticated;
         if (!isAuthenticated)
             return;
