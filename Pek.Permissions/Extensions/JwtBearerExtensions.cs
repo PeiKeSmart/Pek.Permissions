@@ -1,6 +1,4 @@
 ﻿using Microsoft.AspNetCore.Authentication;
-using Microsoft.Extensions.DependencyInjection.Extensions;
-using Microsoft.Extensions.Options;
 
 using Pek.Permissions.Identity.JwtBearer.Internal;
 using Pek.Permissions.Identity.Options;
