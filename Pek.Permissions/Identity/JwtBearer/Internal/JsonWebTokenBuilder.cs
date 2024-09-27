@@ -1,8 +1,4 @@
-﻿using System.IdentityModel.Tokens.Jwt;
-using System.Text;
-
-using Microsoft.Extensions.Options;
-using Microsoft.IdentityModel.Tokens;
+﻿using Microsoft.Extensions.Options;
 
 using NewLife;
 using NewLife.Web;
@@ -31,11 +27,6 @@ internal sealed class JsonWebTokenBuilder : IJsonWebTokenBuilder
     private readonly ITokenPayloadStore _tokenPayloadStore;
 
     /// <summary>
-    /// Jwt安全令牌处理器
-    /// </summary>
-    private readonly JwtSecurityTokenHandler _tokenHandler;
-
-    /// <summary>
     /// Jwt选项配置
     /// </summary>
     private readonly JwtOptions _options;
@@ -53,8 +44,6 @@ internal sealed class JsonWebTokenBuilder : IJsonWebTokenBuilder
         _tokenStore = tokenStore;
         _tokenPayloadStore = tokenPayloadStore;
         _options = options.Value;
-        if (_tokenHandler == null)
-            _tokenHandler = new JwtSecurityTokenHandler();
     }
 
     /// <summary>
@@ -67,91 +56,8 @@ internal sealed class JsonWebTokenBuilder : IJsonWebTokenBuilder
     /// 创建令牌
     /// </summary>
     /// <param name="payload">负载</param>
-    public JsonWebToken Create1(IDictionary<string, string> payload) => Create1(payload, _options);
-
-    /// <summary>
-    /// 创建令牌
-    /// </summary>
-    /// <param name="payload">负载</param>
-    /// <param name="AccessExpireMinutes">访问令牌有效期分钟数</param>
-    /// <param name="RefreshExpireMinutes">刷新令牌有效期分钟数</param>
-    public JsonWebToken Create(IDictionary<string, string> payload, Double RefreshExpireMinutes, Double AccessExpireMinutes = 0)
-    {
-        var options = _options.DeepClone();
-
-        if (AccessExpireMinutes > 0)
-        {
-            options.AccessExpireMinutes = AccessExpireMinutes;
-        }
-
-        if (RefreshExpireMinutes > 0)
-        {
-            options.RefreshExpireMinutes = RefreshExpireMinutes;
-        }
-
-        return Create(payload, options);
-    }
-
-    /// <summary>
-    /// 创建令牌
-    /// </summary>
-    /// <param name="payload">负载</param>
     /// <param name="options">Jwt选项配置</param>
     public JsonWebToken Create(IDictionary<string, string> payload, JwtOptions options)
-    {
-        if (string.IsNullOrWhiteSpace(options.Secret))
-            throw new ArgumentNullException(nameof(options.Secret),
-                $@"{nameof(options.Secret)}为Null或空字符串。请在""appsettings.json""配置""{nameof(JwtOptions)}""节点及其子节点""{nameof(JwtOptions.Secret)}""");
-        var clientId = payload.ContainsKey("clientId") ? payload["clientId"] : Guid.NewGuid().ToString();
-        var clientType = payload.ContainsKey("clientType") ? payload["clientType"] : "admin";
-        var userId = GetUserId(payload);
-        if (userId.IsEmpty())
-            throw new ArgumentException("不存在用户标识");
-        var claims = Helper.ToClaims(payload);
-
-        // 生成刷新令牌
-        var (refreshToken, refreshExpires) =
-            Helper.CreateToken(_tokenHandler, claims, options, JsonWebTokenType.RefreshToken);
-        var refreshTokenStr = refreshToken;
-        _tokenStore.SaveRefreshToken(new RefreshToken()
-        {
-            ClientId = clientId,
-            EndUtcTime = refreshExpires,
-            Value = refreshTokenStr
-        });
-
-        // 生成访问令牌
-        var (token, accessExpires) =
-            Helper.CreateToken(_tokenHandler, claims, options, JsonWebTokenType.AccessToken);
-        var accessToken = new JsonWebToken()
-        {
-            AccessToken = token,
-            AccessTokenUtcExpires = Conv.To<long>(accessExpires.ToJsGetTime()),
-            RefreshToken = refreshTokenStr,
-            RefreshUtcExpires = Conv.To<long>(refreshExpires.ToJsGetTime())
-        };
-        _tokenStore.SaveToken(accessToken, accessExpires);
-
-        // 绑定用户设备令牌
-        _tokenStore.BindUserDeviceToken(userId, clientType, new DeviceTokenBindInfo()
-        {
-            UserId = userId,
-            DeviceId = clientId,
-            DeviceType = clientType,
-            Token = accessToken,
-        }, refreshExpires);
-        // 存储payload
-        _tokenPayloadStore.Save(refreshToken, payload, refreshExpires);
-        _tokenPayloadStore.Save(token, payload, accessExpires);
-        return accessToken;
-    }
-
-    /// <summary>
-    /// 创建令牌
-    /// </summary>
-    /// <param name="payload">负载</param>
-    /// <param name="options">Jwt选项配置</param>
-    public JsonWebToken Create1(IDictionary<string, string> payload, JwtOptions options)
     {
         if (options.Secret.IsNullOrWhiteSpace())
             throw new ArgumentNullException(nameof(options.Secret),
@@ -218,11 +124,10 @@ internal sealed class JsonWebTokenBuilder : IJsonWebTokenBuilder
     /// 获取用户标识
     /// </summary>
     /// <param name="payload">负载列表</param>
-    private string GetUserId(IDictionary<string, string> payload)
+    private string GetUserId(IDictionary<String, String> payload)
     {
-        var userId = payload.GetOrDefault(IdentityModel.JwtClaimTypes.Subject, string.Empty);
-        if (userId.IsEmpty())
-            userId = payload.GetOrDefault(System.Security.Claims.ClaimTypes.Sid, string.Empty);
+        var userId = payload.GetOrDefault(System.Security.Claims.ClaimTypes.Sid, String.Empty);
+
         return userId;
     }
 
@@ -253,16 +158,12 @@ internal sealed class JsonWebTokenBuilder : IJsonWebTokenBuilder
     /// 刷新令牌
     /// </summary>
     /// <param name="refreshToken">刷新令牌</param>
+    /// <param name="options"></param>
     public JsonWebToken Refresh(string refreshToken, JwtOptions options)
     {
-        if (string.IsNullOrWhiteSpace(refreshToken))
+        if (refreshToken.IsNullOrWhiteSpace())
             throw new ArgumentNullException(nameof(refreshToken));
-        var parameters = new TokenValidationParameters()
-        {
-            ValidIssuer = options.Issuer,
-            ValidAudience = options.Audience,
-            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(options.Secret)),
-        };
+
         var tokenModel = _tokenStore.GetRefreshToken(refreshToken);
         if (tokenModel == null || tokenModel.Value != refreshToken || tokenModel.EndUtcTime <= DateTime.UtcNow)
         {
@@ -274,8 +175,7 @@ internal sealed class JsonWebTokenBuilder : IJsonWebTokenBuilder
 
             throw new Warning("刷新令牌不存在或已过期");
         }
-
-        var principal = _tokenHandler.ValidateToken(refreshToken, parameters, out var securityToken);
+        
         var payload = _tokenPayloadStore.Get(refreshToken);
         var result = Create(payload, options);
         if (result != null)
@@ -321,12 +221,7 @@ internal sealed class JsonWebTokenBuilder : IJsonWebTokenBuilder
     {
         if (string.IsNullOrWhiteSpace(refreshToken))
             throw new ArgumentNullException(nameof(refreshToken));
-        var parameters = new TokenValidationParameters()
-        {
-            ValidIssuer = _options.Issuer,
-            ValidAudience = _options.Audience,
-            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_options.Secret)),
-        };
+
         var tokenModel = _tokenStore.GetRefreshToken(refreshToken);
         if (tokenModel == null || tokenModel.Value != refreshToken || tokenModel.EndUtcTime <= DateTime.UtcNow)
         {
@@ -339,7 +234,6 @@ internal sealed class JsonWebTokenBuilder : IJsonWebTokenBuilder
             throw new Warning("刷新令牌不存在或已过期");
         }
 
-        var principal = _tokenHandler.ValidateToken(refreshToken, parameters, out var securityToken);
         var payload = _tokenPayloadStore.Get(refreshToken);
         var result = Create(payload, _options);
         if (result != null)

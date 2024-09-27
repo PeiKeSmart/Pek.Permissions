@@ -10,13 +10,13 @@ public class JsonWebTokenAuthorizationRequirement : IJsonWebTokenAuthorizationRe
     /// <summary>
     /// 校验负载
     /// </summary>
-    protected internal Func<IDictionary<string, string>, JwtOptions, bool> ValidatePayload = (a, b) => true;
+    protected internal Func<IDictionary<String, Object>, JwtOptions, bool> ValidatePayload = (a, b) => true;
 
     /// <summary>
     /// 设置校验函数
     /// </summary>
     /// <param name="func">校验函数</param>
-    public virtual IJsonWebTokenAuthorizationRequirement SetValidateFunc(Func<IDictionary<string, string>, JwtOptions, bool> func)
+    public virtual IJsonWebTokenAuthorizationRequirement SetValidateFunc(Func<IDictionary<String, Object>, JwtOptions, Boolean> func)
     {
         ValidatePayload = func;
         return this;

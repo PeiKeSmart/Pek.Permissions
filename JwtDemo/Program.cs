@@ -44,6 +44,13 @@ internal class Program
         }
 
         XTrace.WriteLine($"获取到的数据2：{s.Item1.Subject}");
+
+        var jwtArray = token1.Split('.');
+        var payload = jwtArray[1].ToBase64().ToStr().DecodeJson();
+        foreach (var item in payload!)
+        {
+            XTrace.WriteLine($"获取到的数据3：{item.Key}:{item.Value}");
+        }
     }
 
     /// <summary>颁发令牌</summary>

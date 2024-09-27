@@ -1,15 +1,14 @@
-﻿using System.Security.Claims;
-
-using DH.Permissions.Identity.JwtBearer;
+﻿using DH.Permissions.Identity.JwtBearer;
 
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc.Filters;
 using Microsoft.Extensions.Options;
-using Microsoft.IdentityModel.Tokens;
 
+using NewLife;
 using NewLife.Log;
 using NewLife.Serialization;
 
+using Pek;
 using Pek.Security;
 
 namespace DH.Permissions.Authorization.Policies;
@@ -91,8 +90,8 @@ public class JsonWebTokenAuthorizationHandler : AuthorizationHandler<JsonWebToke
         if (_options.SingleDeviceEnabled)
         {
             var payload = GetPayload(token);
-            var bindDeviceInfo = _tokenStore.GetUserDeviceToken(payload["sub"], payload["clientType"]);
-            if (bindDeviceInfo.DeviceId != payload["clientId"])
+            var bindDeviceInfo = _tokenStore.GetUserDeviceToken(payload["sub"].SafeString(), payload["clientType"].SafeString());
+            if (bindDeviceInfo.DeviceId != payload["clientId"].SafeString())
                 throw new UnauthorizedAccessException("该账号已在其它设备登录");
         }
         var isAuthenticated = httpContext.User.Identity.IsAuthenticated;
@@ -150,8 +149,8 @@ public class JsonWebTokenAuthorizationHandler : AuthorizationHandler<JsonWebToke
         // 单设备登录
         if (_options.SingleDeviceEnabled)
         {
-            var bindDeviceInfo = _tokenStore.GetUserDeviceToken(payload["sub"], payload["clientType"]);
-            if (bindDeviceInfo.DeviceId != payload["clientId"])
+            var bindDeviceInfo = _tokenStore.GetUserDeviceToken(payload["sub"].SafeString(), payload["clientType"].SafeString());
+            if (bindDeviceInfo.DeviceId != payload["clientId"].SafeString())
             {
                 context.Fail();
                 return;
@@ -172,12 +171,12 @@ public class JsonWebTokenAuthorizationHandler : AuthorizationHandler<JsonWebToke
     /// 获取Payload
     /// </summary>
     /// <param name="encodeJwt">加密后的Jwt令牌</param>
-    private IDictionary<string, string> GetPayload(string encodeJwt)
+    private IDictionary<String, Object> GetPayload(String encodeJwt)
     {
         var jwtArray = encodeJwt.Split('.');
         if (jwtArray.Length < 3)
             throw new ArgumentException($"非有效Jwt令牌");
-        var payload = JsonHelper.ToJsonEntity<Dictionary<string, string>>(Base64UrlEncoder.Decode(jwtArray[1]));
+        var payload = jwtArray[1].ToBase64().ToStr().DecodeJson();
         return payload;
     }
 }

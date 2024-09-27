@@ -24,7 +24,7 @@ public class JsonWebTokenCustomerAuthorizeMiddleware
     /// <summary>
     /// 校验负载
     /// </summary>
-    private readonly Func<IDictionary<string, string>, JwtOptions, bool> _validatePayload;
+    private readonly Func<IDictionary<String, Object>, JwtOptions, Boolean> _validatePayload;
 
     /// <summary>
     /// 匿名访问路径列表
@@ -48,8 +48,8 @@ public class JsonWebTokenCustomerAuthorizeMiddleware
         RequestDelegate next
         , IOptions<JwtOptions> options
         , IJsonWebTokenValidator tokenValidator
-        , Func<IDictionary<string, string>, JwtOptions, bool> validatePayload
-        , IList<string> anonymousPathList)
+        , Func<IDictionary<String, Object>, JwtOptions, Boolean> validatePayload
+        , IList<String> anonymousPathList)
     {
         _next = next;
         _options = options.Value;
@@ -72,7 +72,7 @@ public class JsonWebTokenCustomerAuthorizeMiddleware
         }
 
         var result = context.Request.Headers.TryGetValue("Authorization", out var authStr);
-        if (!result || string.IsNullOrWhiteSpace(authStr.ToString()))
+        if (!result || String.IsNullOrWhiteSpace(authStr.ToString()))
             throw new UnauthorizedAccessException("未授权，请传递Header头的Authorization参数");
         // 校验以及自定义校验
         result = _tokenValidator.Validate(authStr.ToString().Substring("Bearer ".Length).Trim(), _options,

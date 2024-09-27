@@ -1,7 +1,6 @@
 ﻿using System.Security.Claims;
 
-using Microsoft.IdentityModel.Tokens;
-
+using NewLife;
 using NewLife.Serialization;
 using NewLife.Web;
 
@@ -21,16 +20,16 @@ internal sealed class JsonWebTokenValidator : IJsonWebTokenValidator
     /// <param name="encodeJwt">加密后的Jwt令牌</param>
     /// <param name="options">Jwt选项配置</param>
     /// <param name="validatePayload">校验负载</param>
-    public bool Validate(string encodeJwt, JwtOptions options, Func<IDictionary<string, string>, JwtOptions, bool> validatePayload)
+    public Boolean Validate(String encodeJwt, JwtOptions options, Func<IDictionary<String, Object>, JwtOptions, Boolean> validatePayload)
     {
-        if (string.IsNullOrWhiteSpace(options.Secret))
+        if (options.Secret.IsNullOrWhiteSpace())
             throw new ArgumentNullException(nameof(options.Secret),
                 $@"{nameof(options.Secret)}为Null或空字符串。请在""appsettings.json""配置""{nameof(JwtOptions)}""节点及其子节点""{nameof(JwtOptions.Secret)}""");
         var jwtArray = encodeJwt.Split('.');
         if (jwtArray.Length < 3)
             return false;
-        var header = JsonHelper.ToJsonEntity<Dictionary<string, string>>(Base64UrlEncoder.Decode(jwtArray[0]));
-        var payload = JsonHelper.ToJsonEntity<Dictionary<string, string>>(Base64UrlEncoder.Decode(jwtArray[1]));
+        var header = jwtArray[0].ToBase64().ToStr().DecodeJson();
+        var payload = jwtArray[1].ToBase64().ToStr().DecodeJson();
 
         // 首先验证签名是否正确
         var ss = options.Secret.Split(':');

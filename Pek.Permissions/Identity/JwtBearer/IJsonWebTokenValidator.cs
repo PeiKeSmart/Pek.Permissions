@@ -14,5 +14,5 @@ public interface IJsonWebTokenValidator
     /// <param name="options">Jwt选项配置</param>
     /// <param name="validatePayload">校验负载</param>
     bool Validate(string encodeJwt, JwtOptions options,
-        Func<IDictionary<string, string>, JwtOptions, bool> validatePayload);
+        Func<IDictionary<String, Object>, JwtOptions, Boolean> validatePayload);
 }

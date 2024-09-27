@@ -23,6 +23,7 @@ public interface ITokenPayloadStore
     /// 延时移除
     /// </summary>
     /// <param name="token">令牌</param>
+    /// <param name="expire"></param>
     void Remove(string token, Int32 expire);
 
     /// <summary>
