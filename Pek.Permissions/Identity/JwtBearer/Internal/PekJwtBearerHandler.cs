@@ -29,17 +29,13 @@ public class PekJwtBearerHandler : AuthenticationHandler<PekJwtBearerOptions>
     {
         XTrace.WriteLine($"进来了么PekJwtBearerHandler");
 
-        if (!Request.Headers.TryGetValue("Authorization", out var authorizationHeader))
-        {
-            return AuthenticateResult.NoResult();
-        }
+        if (_jwtOptions.Secret.IsNullOrWhiteSpace()) return AuthenticateResult.Fail("Secret is null.");
+
+        if (!Request.Headers.TryGetValue("Authorization", out var authorizationHeader)) return AuthenticateResult.NoResult();
 
         var token = authorizationHeader.ToString().Replace("Bearer ", String.Empty).Trim();
 
-        if (token.IsNullOrWhiteSpace())
-        {
-            return AuthenticateResult.NoResult();
-        }
+        if (token.IsNullOrWhiteSpace()) return AuthenticateResult.NoResult();
 
         // 解码令牌
         var ss = _jwtOptions.Secret.Split(':');
@@ -49,13 +45,10 @@ public class PekJwtBearerHandler : AuthenticationHandler<PekJwtBearerOptions>
             Secret = ss[1],
         };
 
-        if (!jwt.TryDecode(token, out _))
-        {
-            return AuthenticateResult.Fail("Invalid token signature.");
-        }
+        if (!jwt.TryDecode(token, out _)) return AuthenticateResult.Fail("Invalid token signature.");
 
         var claims = Helper.ToClaims(jwt.Items);
-        var claimsPrincipal = new ClaimsPrincipal(new ClaimsIdentity(claims));
+        var claimsPrincipal = new ClaimsPrincipal(new ClaimsIdentity(claims, "jwt"));
 
         var ticket = new AuthenticationTicket(claimsPrincipal, Scheme.Name);
         return AuthenticateResult.Success(ticket);
