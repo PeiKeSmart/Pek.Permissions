@@ -1,10 +1,14 @@
-﻿using DH.Permissions.Authorization.Middlewares;
+﻿using System.Text;
+
+using DH.Permissions.Authorization.Middlewares;
 using DH.Permissions.Authorization.Policies;
 using DH.Permissions.Identity.JwtBearer;
 using DH.Permissions.Identity.JwtBearer.Internal;
 
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.IdentityModel.Tokens;
 
 using Pek.Security;
 
@@ -32,37 +36,37 @@ public static partial class Extensions
             option.AnonymousPaths);
     }
 
-    ///// <summary>
-    ///// 注册Jwt服务
-    ///// </summary>
-    ///// <param name="services">服务集合</param>
-    ///// <param name="configuration">配置</param>
-    //public static void AddJwt(this IServiceCollection services, IConfiguration configuration)
-    //{
-    //    services.Configure<JwtOptions>(o => configuration.GetSection(nameof(JwtOptions)).Bind(o));
-    //    var options = GetOptions(configuration);
-    //    services.TryAddSingleton<IJsonWebTokenBuilder, JsonWebTokenBuilder>();
-    //    services.TryAddSingleton<IJsonWebTokenStore, JsonWebTokenStore>();
-    //    services.TryAddSingleton<IJsonWebTokenValidator, JsonWebTokenValidator>();
-    //    services.TryAddSingleton<IJsonWebTokenCustomerAuthorizeOption, JsonWebTokenCustomerAuthorizeOption>();
-    //    services.TryAddSingleton<IJsonWebTokenAuthorizationRequirement, JsonWebTokenAuthorizationRequirement>();
-    //    services.TryAddSingleton<ITokenPayloadStore, TokenPayloadStore>();
-    //    services.AddSingleton<IAuthorizationHandler, JsonWebTokenAuthorizationHandler>();
-    //    services.AddAuthorization(o =>
-    //    {
-    //        o.AddPolicy("jwt", policy => policy.Requirements.Add(new JsonWebTokenAuthorizationRequirement()));
-    //    })
-    //        .AddAuthentication(o =>
-    //        {
-    //            o.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
-    //            o.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
-    //        })
-    //        .AddJwtBearer(o =>
-    //        {
-    //            o.TokenValidationParameters = GetValidationParameters(options);
-    //            o.SaveToken = true;
-    //        });
-    //}
+    /// <summary>
+    /// 注册Jwt服务
+    /// </summary>
+    /// <param name="services">服务集合</param>
+    /// <param name="configuration">配置</param>
+    public static void AddJwt(this IServiceCollection services, IConfiguration configuration)
+    {
+        services.Configure<JwtOptions>(o => configuration.GetSection(nameof(JwtOptions)).Bind(o));
+        var options = GetOptions(configuration);
+        services.TryAddSingleton<IJsonWebTokenBuilder, JsonWebTokenBuilder>();
+        services.TryAddSingleton<IJsonWebTokenStore, JsonWebTokenStore>();
+        services.TryAddSingleton<IJsonWebTokenValidator, JsonWebTokenValidator>();
+        services.TryAddSingleton<IJsonWebTokenCustomerAuthorizeOption, JsonWebTokenCustomerAuthorizeOption>();
+        services.TryAddSingleton<IJsonWebTokenAuthorizationRequirement, JsonWebTokenAuthorizationRequirement>();
+        services.TryAddSingleton<ITokenPayloadStore, TokenPayloadStore>();
+        services.AddSingleton<IAuthorizationHandler, JsonWebTokenAuthorizationHandler>();
+        services.AddAuthorization(o =>
+        {
+            o.AddPolicy("jwt", policy => policy.Requirements.Add(new JsonWebTokenAuthorizationRequirement()));
+        })
+            .AddAuthentication(o =>
+            {
+                o.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+                o.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+            })
+            .AddJwtBearer(o =>
+            {
+                o.TokenValidationParameters = GetValidationParameters(options);
+                o.SaveToken = true;
+            });
+    }
 
     /// <summary>
     /// 注册Jwt服务
@@ -87,24 +91,24 @@ public static partial class Extensions
     /// <param name="configuration">配置</param>
     private static JwtOptions GetOptions(IConfiguration configuration) => configuration.GetSection(nameof(JwtOptions)).Get<JwtOptions>();
 
-    ///// <summary>
-    ///// 获取验证参数
-    ///// </summary>
-    ///// <param name="options">Jwt选项配置</param>
-    //private static TokenValidationParameters GetValidationParameters(JwtOptions options)
-    //{
-    //    return new TokenValidationParameters()
-    //    {
-    //        ValidateIssuerSigningKey = true, // 是否验证发行者签名密钥
-    //        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(options.Secret)),
-    //        ValidateIssuer = true, // 是否验证发行者
-    //        ValidIssuer = options.Issuer,
-    //        ValidateAudience = true, // 是否验证接收者
-    //        ValidAudience = options.Audience,
-    //        ValidateLifetime = true, // 是否验证超时
-    //        LifetimeValidator = (before, expires, token, param) => expires > DateTime.UtcNow,
-    //        ClockSkew = TimeSpan.FromSeconds(30), // 缓冲过期时间，总的有效时间等于该时间加上Jwt的过期时间，如果不配置，则默认是5分钟
-    //        RequireExpirationTime = true
-    //    };
-    //}
+    /// <summary>
+    /// 获取验证参数
+    /// </summary>
+    /// <param name="options">Jwt选项配置</param>
+    private static TokenValidationParameters GetValidationParameters(JwtOptions options)
+    {
+        return new TokenValidationParameters()
+        {
+            ValidateIssuerSigningKey = true, // 是否验证发行者签名密钥
+            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(options.Secret)),
+            ValidateIssuer = true, // 是否验证发行者
+            ValidIssuer = options.Issuer,
+            ValidateAudience = true, // 是否验证接收者
+            ValidAudience = options.Audience,
+            ValidateLifetime = true, // 是否验证超时
+            LifetimeValidator = (before, expires, token, param) => expires > DateTime.UtcNow,
+            ClockSkew = TimeSpan.FromSeconds(30), // 缓冲过期时间，总的有效时间等于该时间加上Jwt的过期时间，如果不配置，则默认是5分钟
+            RequireExpirationTime = true
+        };
+    }
 }
