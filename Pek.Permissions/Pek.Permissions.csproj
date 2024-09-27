@@ -44,8 +44,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <!--<PackageReference Include="IdentityModel" Version="7.0.0" />-->
-    <!--<PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="8.0.8" />-->
     <PackageReference Include="Microsoft.SourceLink.GitHub" Version="8.0.0">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
@@ -56,21 +54,6 @@
 
   <ItemGroup>
     <Content Include="..\Doc\DH.png" Link="DH.png" PackagePath="\" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <Compile Update="Properties\SecurityResources.Designer.cs">
-      <DesignTime>True</DesignTime>
-      <AutoGen>True</AutoGen>
-      <DependentUpon>SecurityResources.resx</DependentUpon>
-    </Compile>
-  </ItemGroup>
-
-  <ItemGroup>
-    <EmbeddedResource Update="Properties\SecurityResources.resx">
-      <Generator>ResXFileCodeGenerator</Generator>
-      <LastGenOutput>SecurityResources.Designer.cs</LastGenOutput>
-    </EmbeddedResource>
   </ItemGroup>
 
 </Project>
