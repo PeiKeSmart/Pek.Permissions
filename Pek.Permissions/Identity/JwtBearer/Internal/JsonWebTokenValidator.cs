@@ -41,8 +41,8 @@ internal sealed class JsonWebTokenValidator : IJsonWebTokenValidator
         if (!jwt.TryDecode(encodeJwt, out _))
             return false;
 
-        var claims = Helper.ToClaims(jwt.Items);
-        DHWeb.HttpContext.User = new ClaimsPrincipal(new ClaimsIdentity(claims, "jwt"));
+        //var claims = Helper.ToClaims(jwt.Items);
+        //DHWeb.HttpContext.User = new ClaimsPrincipal(new ClaimsIdentity(claims, "jwt"));
 
         //var hs256 = new HMACSHA256(Encoding.UTF8.GetBytes(options.Secret));
         //var sign = Base64UrlEncoder.Encode(

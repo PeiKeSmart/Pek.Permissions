@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.Extensions.Options;
 
 using NewLife;
+using NewLife.Log;
 using NewLife.Web;
 
 using Pek.Permissions.Identity.Options;
@@ -26,6 +27,8 @@ public class PekJwtBearerHandler : AuthenticationHandler<PekJwtBearerOptions>
 
     protected override async Task<AuthenticateResult> HandleAuthenticateAsync()
     {
+        XTrace.WriteLine($"进来了么PekJwtBearerHandler");
+
         if (!Request.Headers.TryGetValue("Authorization", out var authorizationHeader))
         {
             return AuthenticateResult.NoResult();
