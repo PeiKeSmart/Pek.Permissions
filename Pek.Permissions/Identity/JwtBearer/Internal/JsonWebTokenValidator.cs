@@ -1,8 +1,5 @@
-﻿using System.Security.Claims;
-
-using NewLife;
+﻿using NewLife;
 using NewLife.Serialization;
-using NewLife.Web;
 
 using Pek.Helpers;
 using Pek.Security;
@@ -22,24 +19,27 @@ internal sealed class JsonWebTokenValidator : IJsonWebTokenValidator
     /// <param name="validatePayload">校验负载</param>
     public Boolean Validate(String encodeJwt, JwtOptions options, Func<IDictionary<String, Object>, JwtOptions, Boolean> validatePayload)
     {
-        if (options.Secret.IsNullOrWhiteSpace())
-            throw new ArgumentNullException(nameof(options.Secret),
-                $@"{nameof(options.Secret)}为Null或空字符串。请在""appsettings.json""配置""{nameof(JwtOptions)}""节点及其子节点""{nameof(JwtOptions.Secret)}""");
+        //if (options.Secret.IsNullOrWhiteSpace())
+        //    throw new ArgumentNullException(nameof(options.Secret),
+        //        $@"{nameof(options.Secret)}为Null或空字符串。请在""appsettings.json""配置""{nameof(JwtOptions)}""节点及其子节点""{nameof(JwtOptions.Secret)}""");
         var jwtArray = encodeJwt.Split('.');
         if (jwtArray.Length < 3)
             return false;
         var header = jwtArray[0].ToBase64().ToStr().DecodeJson();
         var payload = jwtArray[1].ToBase64().ToStr().DecodeJson();
 
-        // 首先验证签名是否正确
-        var ss = options.Secret.Split(':');
-        var jwt = new JwtBuilder
-        {
-            Algorithm = ss[0],
-            Secret = ss[1],
-        };
-        if (!jwt.TryDecode(encodeJwt, out _))
-            return false;
+        DHWeb.HttpContext.Items["jwt-header"] = header;
+        DHWeb.HttpContext.Items["jwt-payload"] = payload;
+
+        //// 首先验证签名是否正确
+        //var ss = options.Secret.Split(':');
+        //var jwt = new JwtBuilder
+        //{
+        //    Algorithm = ss[0],
+        //    Secret = ss[1],
+        //};
+        //if (!jwt.TryDecode(encodeJwt, out _))
+        //    return false;
 
         //var claims = Helper.ToClaims(jwt.Items);
         //DHWeb.HttpContext.User = new ClaimsPrincipal(new ClaimsIdentity(claims, "jwt"));
@@ -58,11 +58,4 @@ internal sealed class JsonWebTokenValidator : IJsonWebTokenValidator
         
         return validatePayload(payload, options);
     }
-
-    /// <summary>
-    /// 生成时间戳
-    /// </summary>
-    private long ToUnixEpochDate(DateTime date) =>
-        (long)Math.Round((date.ToUniversalTime() - new DateTimeOffset(1970, 1, 1, 0, 0, 0, TimeSpan.Zero))
-            .TotalSeconds);
 }

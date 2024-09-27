@@ -7,7 +7,6 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.Extensions.Options;
 
 using NewLife;
-using NewLife.Log;
 using NewLife.Web;
 
 using Pek.Permissions.Identity.Options;
@@ -27,8 +26,6 @@ public class PekJwtBearerHandler : AuthenticationHandler<PekJwtBearerOptions>
 
     protected override async Task<AuthenticateResult> HandleAuthenticateAsync()
     {
-        XTrace.WriteLine($"进来了么PekJwtBearerHandler");
-
         if (_jwtOptions.Secret.IsNullOrWhiteSpace()) return AuthenticateResult.Fail("Secret is null.");
 
         if (!Request.Headers.TryGetValue("Authorization", out var authorizationHeader)) return AuthenticateResult.NoResult();
@@ -49,6 +46,10 @@ public class PekJwtBearerHandler : AuthenticationHandler<PekJwtBearerOptions>
 
         var claims = Helper.ToClaims(jwt.Items);
         var claimsPrincipal = new ClaimsPrincipal(new ClaimsIdentity(claims, "jwt"));
+
+        Context.Items["jwt-Authorization"] = token;
+
+        await Task.CompletedTask;
 
         var ticket = new AuthenticationTicket(claimsPrincipal, Scheme.Name);
         return AuthenticateResult.Success(ticket);

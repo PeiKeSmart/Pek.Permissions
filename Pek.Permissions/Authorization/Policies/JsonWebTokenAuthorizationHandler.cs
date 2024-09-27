@@ -4,11 +4,8 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc.Filters;
 using Microsoft.Extensions.Options;
 
-using NewLife;
-using NewLife.Log;
-using NewLife.Serialization;
-
 using Pek;
+using Pek.Helpers;
 using Pek.Security;
 
 namespace DH.Permissions.Authorization.Policies;
@@ -74,22 +71,19 @@ public class JsonWebTokenAuthorizationHandler : AuthorizationHandler<JsonWebToke
     protected virtual void ThrowExceptionHandle(AuthorizationHandlerContext context,
         JsonWebTokenAuthorizationRequirement requirement)
     {
-        XTrace.WriteLine($"进来这里了么？ThrowExceptionHandle");
         var httpContext = (context.Resource as AuthorizationFilterContext)?.HttpContext;
         if (httpContext == null)
             return;
         // 未登录而被拒绝
-        var result = httpContext.Request.Headers.TryGetValue("Authorization", out var authorizationHeader);
-        if (!result || string.IsNullOrWhiteSpace(authorizationHeader))
-            throw new UnauthorizedAccessException("未授权，请传递Header头的Authorization参数");
-        var token = authorizationHeader.ToString().Split(' ').Last().Trim();
+        var authorizationHeader = httpContext.Items["jwt-Authorization"].SafeString();
+        var token = authorizationHeader.Trim();
         if (!_tokenStore.ExistsToken(token))
             throw new UnauthorizedAccessException("未授权，无效参数");
         if (!_tokenValidator.Validate(token, _options, requirement.ValidatePayload))
             throw new UnauthorizedAccessException("验证失败，请查看传递的参数是否正确或是否有权限访问该地址。");
         if (_options.SingleDeviceEnabled)
         {
-            var payload = GetPayload(token);
+            var payload = DHWeb.HttpContext.Items["jwt-payload"] as IDictionary<String, Object>;
             var bindDeviceInfo = _tokenStore.GetUserDeviceToken(payload["sub"].SafeString(), payload["clientType"].SafeString());
             if (bindDeviceInfo.DeviceId != payload["clientId"].SafeString())
                 throw new UnauthorizedAccessException("该账号已在其它设备登录");
@@ -106,7 +100,6 @@ public class JsonWebTokenAuthorizationHandler : AuthorizationHandler<JsonWebToke
     protected virtual void ResultHandle(AuthorizationHandlerContext context,
         JsonWebTokenAuthorizationRequirement requirement)
     {
-        XTrace.WriteLine($"进来这里了么？ResultHandle");
         var httpContext = _accessor.HttpContext;
 
         if (httpContext == null)
@@ -114,28 +107,18 @@ public class JsonWebTokenAuthorizationHandler : AuthorizationHandler<JsonWebToke
         if (httpContext == null)
             return;
 
-        // 未登录而被拒绝
-        var result = httpContext.Request.Headers.TryGetValue("Authorization", out var authorizationHeader);
-        XTrace.WriteLine($"进来这里了么1？ResultHandle");
-        if (!result || String.IsNullOrWhiteSpace(authorizationHeader))
-        {
-            context.Fail();
-            return;
-        }
-        XTrace.WriteLine($"进来这里了么2？ResultHandle");
-        var token = authorizationHeader.ToString().Split(' ').Last().Trim();
+        var authorizationHeader = httpContext.Items["jwt-Authorization"].SafeString();
+        var token = authorizationHeader.Trim();
         if (!_tokenStore.ExistsToken(token))
         {
             context.Fail();
             return;
         }
-        XTrace.WriteLine($"进来这里了么3？ResultHandle");
         if (!_tokenValidator.Validate(token, _options, requirement.ValidatePayload))
         {
             context.Fail();
             return;
         }
-        XTrace.WriteLine($"进来这里了么4？ResultHandle");
         // 登录超时
         var accessToken = _tokenStore.GetToken(token);
         if (accessToken.IsExpired())
@@ -143,8 +126,7 @@ public class JsonWebTokenAuthorizationHandler : AuthorizationHandler<JsonWebToke
             context.Fail();
             return;
         }
-        XTrace.WriteLine($"进来这里了么5？ResultHandle");
-        var payload = GetPayload(token);
+        var payload = DHWeb.HttpContext.Items["jwt-payload"] as IDictionary<String, Object>;
 
         // 单设备登录
         if (_options.SingleDeviceEnabled)
@@ -156,27 +138,12 @@ public class JsonWebTokenAuthorizationHandler : AuthorizationHandler<JsonWebToke
                 return;
             }
         }
-        XTrace.WriteLine($"进来这里了么6？ResultHandle");
 
         var isAuthenticated = httpContext.User.Identity.IsAuthenticated;
         if (!isAuthenticated)
             return;
-        XTrace.WriteLine($"进来这里了么7？ResultHandle");
         httpContext.Items["clientId"] = payload["clientId"];
 
         context.Succeed(requirement);
-    }
-
-    /// <summary>
-    /// 获取Payload
-    /// </summary>
-    /// <param name="encodeJwt">加密后的Jwt令牌</param>
-    private IDictionary<String, Object> GetPayload(String encodeJwt)
-    {
-        var jwtArray = encodeJwt.Split('.');
-        if (jwtArray.Length < 3)
-            throw new ArgumentException($"非有效Jwt令牌");
-        var payload = jwtArray[1].ToBase64().ToStr().DecodeJson();
-        return payload;
     }
 }
