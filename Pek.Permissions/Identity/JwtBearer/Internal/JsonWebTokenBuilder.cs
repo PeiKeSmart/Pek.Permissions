@@ -135,16 +135,16 @@ internal sealed class JsonWebTokenBuilder : IJsonWebTokenBuilder
     /// 刷新令牌
     /// </summary>
     /// <param name="refreshToken">刷新令牌</param>
-    public JsonWebToken Refresh(string refreshToken) => Refresh(refreshToken, _options);
+    public JsonWebToken Refresh(String refreshToken) => Refresh(refreshToken, _options);
 
     /// <summary>
     /// 刷新令牌
     /// </summary>
     /// <param name="refreshToken">刷新令牌</param>
     /// <param name="RefreshExpireMinutes">刷新令牌有效期分钟数</param>
-    public JsonWebToken Refresh(string refreshToken, Double RefreshExpireMinutes)
+    public JsonWebToken Refresh(String refreshToken, Double RefreshExpireMinutes)
     {
-        var options = _options.DeepClone();
+        var options = _options.DeepCloneWithJson();
 
         if (RefreshExpireMinutes > 0)
         {
@@ -199,9 +199,9 @@ internal sealed class JsonWebTokenBuilder : IJsonWebTokenBuilder
     /// <param name="refreshToken">刷新令牌</param>
     /// <param name="expire">延时时间。秒</param>
     /// <param name="RefreshExpireMinutes">刷新令牌有效期分钟数</param>
-    public JsonWebToken Refresh(string refreshToken, Int32 expire, Double RefreshExpireMinutes)
+    public JsonWebToken Refresh(String refreshToken, Int32 expire, Double RefreshExpireMinutes)
     {
-        var options = _options.DeepClone();
+        var options = _options.DeepCloneWithJson();
 
         if (RefreshExpireMinutes > 0)
         {
@@ -219,7 +219,7 @@ internal sealed class JsonWebTokenBuilder : IJsonWebTokenBuilder
     /// <param name="options"></param>
     public JsonWebToken Refresh(String refreshToken, Int32 expire, JwtOptions options)
     {
-        if (string.IsNullOrWhiteSpace(refreshToken))
+        if (String.IsNullOrWhiteSpace(refreshToken))
             throw new ArgumentNullException(nameof(refreshToken));
 
         var tokenModel = _tokenStore.GetRefreshToken(refreshToken);
