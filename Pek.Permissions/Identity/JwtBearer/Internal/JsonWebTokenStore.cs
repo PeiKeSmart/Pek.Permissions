@@ -29,7 +29,7 @@ internal sealed class JsonWebTokenStore : IJsonWebTokenStore
         //    _cache = Singleton<FullRedis>.Instance;
         //    if (_cache == null)
         //    {
-        //        XTrace.WriteLine($"Redis缓存对象为空，请检查是否注入FullRedis");
+        //        XTrace.WriteLine($"[JsonWebTokenStore.JsonWebTokenStore]Redis缓存对象为空，请检查是否注入FullRedis");
         //    }
         //}
         //else
