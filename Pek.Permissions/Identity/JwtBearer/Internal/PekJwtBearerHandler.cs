@@ -49,7 +49,7 @@ public class PekJwtBearerHandler : AuthenticationHandler<PekJwtBearerOptions>
 
         Context.Items["jwt-Authorization"] = token;
 
-        await Task.CompletedTask;
+        await Task.CompletedTask.ConfigureAwait(false);
 
         var ticket = new AuthenticationTicket(claimsPrincipal, Scheme.Name);
         return AuthenticateResult.Success(ticket);

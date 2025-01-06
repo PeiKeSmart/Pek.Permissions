@@ -67,7 +67,7 @@ public class JsonWebTokenCustomerAuthorizeMiddleware
         // 如果是匿名访问路径，则直接跳过
         if (_anonymousPathList.Contains(context.Request.Path.Value))
         {
-            await _next(context);
+            await _next(context).ConfigureAwait(false);
             return;
         }
 
@@ -79,6 +79,6 @@ public class JsonWebTokenCustomerAuthorizeMiddleware
             _validatePayload);
         if (!result)
             throw new UnauthorizedAccessException("验证失败，请查看传递的参数是否正确或是否有权限访问该地址。");
-        await _next(context);
+        await _next(context).ConfigureAwait(false);
     }
 }

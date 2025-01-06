@@ -62,7 +62,7 @@ public class JsonWebTokenAuthorizationHandler : AuthorizationHandler<JsonWebToke
             return;
         }
         ResultHandle(context, requirement);
-        await Task.FromResult(0);
+        await Task.FromResult(0).ConfigureAwait(false);
     }
 
     /// <summary>
