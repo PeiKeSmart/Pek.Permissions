@@ -7,8 +7,8 @@
     <AssemblyTitle>JWT权限类库</AssemblyTitle>
     <Description>DH框架的JWT权限类库</Description>
     <Company>湖北登灏科技有限公司</Company>
-    <Copyright>©2020-2024 湖北登灏科技有限公司</Copyright>
-    <VersionPrefix>3.91</VersionPrefix>
+    <Copyright>©2020-2025 湖北登灏科技有限公司</Copyright>
+    <VersionPrefix>4.11</VersionPrefix>
     <VersionSuffix>$([System.DateTime]::Now.ToString(`yyyy.MMdd`))</VersionSuffix>
     <Version>$(VersionPrefix).$(VersionSuffix)</Version>
     <FileVersion>$(Version)</FileVersion>
@@ -51,8 +51,8 @@
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
-    <PackageReference Include="Pek.AspNetCore" Version="4.0.2025.110-beta0311" />
-    <PackageReference Include="Pek.Common" Version="4.0.2025.110-beta0306" />
+    <PackageReference Include="Pek.AspNetCore" Version="4.11.2025.305-beta0338" />
+    <PackageReference Include="Pek.Common" Version="4.11.2025.303" />
   </ItemGroup>
 
   <ItemGroup>
