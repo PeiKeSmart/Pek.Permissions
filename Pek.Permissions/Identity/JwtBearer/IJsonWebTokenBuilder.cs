@@ -17,6 +17,14 @@ public interface IJsonWebTokenBuilder
     /// 创建令牌
     /// </summary>
     /// <param name="payload">负载</param>
+    /// <param name="AccessExpireMinutes">访问令牌有效期分钟数</param>
+    /// <param name="RefreshExpireMinutes">刷新令牌有效期分钟数</param>
+    JsonWebToken Create(IDictionary<String, String> payload, Double RefreshExpireMinutes, Double AccessExpireMinutes = 0);
+
+    /// <summary>
+    /// 创建令牌
+    /// </summary>
+    /// <param name="payload">负载</param>
     /// <param name="options">Jwt选项配置</param>
     JsonWebToken Create(IDictionary<String, String> payload, JwtOptions options);
 

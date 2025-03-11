@@ -50,14 +50,37 @@ internal sealed class JsonWebTokenBuilder : IJsonWebTokenBuilder
     /// 创建令牌
     /// </summary>
     /// <param name="payload">负载</param>
-    public JsonWebToken Create(IDictionary<string, string> payload) => Create(payload, _options);
+    public JsonWebToken Create(IDictionary<String, String> payload) => Create(payload, _options);
+
+    /// <summary>
+    /// 创建令牌
+    /// </summary>
+    /// <param name="payload">负载</param>
+    /// <param name="AccessExpireMinutes">访问令牌有效期分钟数</param>
+    /// <param name="RefreshExpireMinutes">刷新令牌有效期分钟数</param>
+    public JsonWebToken Create(IDictionary<String, String> payload, Double RefreshExpireMinutes, Double AccessExpireMinutes = 0)
+    {
+        var options = _options.DeepCloneWithJson();
+
+        if (AccessExpireMinutes > 0)
+        {
+            options.AccessExpireMinutes = AccessExpireMinutes;
+        }
+
+        if (RefreshExpireMinutes > 0)
+        {
+            options.RefreshExpireMinutes = RefreshExpireMinutes;
+        }
+
+        return Create(payload, options);
+    }
 
     /// <summary>
     /// 创建令牌
     /// </summary>
     /// <param name="payload">负载</param>
     /// <param name="options">Jwt选项配置</param>
-    public JsonWebToken Create(IDictionary<string, string> payload, JwtOptions options)
+    public JsonWebToken Create(IDictionary<String, String> payload, JwtOptions options)
     {
         if (options.Secret.IsNullOrWhiteSpace())
             throw new ArgumentNullException(nameof(options.Secret),
