@@ -6,6 +6,7 @@ using Microsoft.Extensions.Options;
 
 using NewLife;
 using NewLife.Log;
+using NewLife.Serialization;
 using NewLife.Web;
 
 using Pek.Permissions.Identity.Options;
@@ -47,7 +48,14 @@ public class PekJwtBearerHandler : AuthenticationHandler<PekJwtBearerOptions>
 
         if (!jwt.TryDecode(token, out _)) return AuthenticateResult.Fail("Invalid token signature.");
 
+        XTrace.WriteLine($"鉴权进来：PekJwtBearerHandler11111：{jwt.Items.ToJson()}");
+
         var claims = Helper.ToClaims(jwt.Items);
+        if (claims == null || !claims.Any())
+        {
+            XTrace.WriteLine("No valid claims found in token.");
+        }
+
         var claimsPrincipal = new ClaimsPrincipal(new ClaimsIdentity(claims, "jwt"));
 
         Context.Items["jwt-Authorization"] = token;
