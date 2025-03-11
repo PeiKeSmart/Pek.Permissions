@@ -9,7 +9,7 @@ using Pek.Helpers;
 using Pek.Security;
 using Pek.Timing;
 
-namespace DH.Permissions.Identity.JwtBearer.Internal;
+namespace Pek.Permissions.Identity.JwtBearer.Internal;
 
 /// <summary>
 /// Jwt构建器

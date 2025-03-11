@@ -1,6 +1,5 @@
 ﻿using Pek.Security;
-
-namespace DH.Permissions.Identity.JwtBearer;
+namespace Pek.Permissions.Identity.JwtBearer;
 
 /// <summary>
 /// 设备令牌绑定信息

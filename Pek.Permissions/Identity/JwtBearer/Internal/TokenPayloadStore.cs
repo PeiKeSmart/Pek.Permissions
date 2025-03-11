@@ -1,6 +1,6 @@
 ﻿using NewLife.Caching;
 
-namespace DH.Permissions.Identity.JwtBearer.Internal;
+namespace Pek.Permissions.Identity.JwtBearer.Internal;
 
 /// <summary>
 /// 令牌Payload存储器

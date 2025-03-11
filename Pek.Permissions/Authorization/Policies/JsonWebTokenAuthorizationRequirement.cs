@@ -1,6 +1,6 @@
 ﻿using Pek.Security;
 
-namespace DH.Permissions.Authorization.Policies;
+namespace Pek.Permissions.Authorization.Policies;
 
 /// <summary>
 /// JWT授权请求

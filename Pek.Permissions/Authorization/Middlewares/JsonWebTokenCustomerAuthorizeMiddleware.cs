@@ -1,10 +1,10 @@
-﻿using DH.Permissions.Identity.JwtBearer;
+﻿using Pek.Permissions.Identity.JwtBearer;
 
 using Microsoft.Extensions.Options;
 
 using Pek.Security;
 
-namespace DH.Permissions.Authorization.Middlewares;
+namespace Pek.Permissions.Authorization.Middlewares;
 
 /// <summary>
 /// JWT客户授权中间件

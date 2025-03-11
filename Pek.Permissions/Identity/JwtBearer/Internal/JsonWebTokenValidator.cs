@@ -4,7 +4,7 @@ using NewLife.Serialization;
 using Pek.Helpers;
 using Pek.Security;
 
-namespace DH.Permissions.Identity.JwtBearer.Internal;
+namespace Pek.Permissions.Identity.JwtBearer.Internal;
 
 /// <summary>
 /// Jwt令牌校验器

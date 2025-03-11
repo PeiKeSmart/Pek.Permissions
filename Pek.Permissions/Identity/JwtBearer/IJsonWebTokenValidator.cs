@@ -1,6 +1,6 @@
 ﻿using Pek.Security;
 
-namespace DH.Permissions.Identity.JwtBearer;
+namespace Pek.Permissions.Identity.JwtBearer;
 
 /// <summary>
 /// Jwt令牌校验器

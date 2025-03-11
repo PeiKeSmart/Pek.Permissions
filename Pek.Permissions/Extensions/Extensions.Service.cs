@@ -1,14 +1,14 @@
-﻿using DH.Permissions.Authorization.Middlewares;
-using DH.Permissions.Authorization.Policies;
-using DH.Permissions.Identity.JwtBearer;
-using DH.Permissions.Identity.JwtBearer.Internal;
+﻿using Pek.Permissions.Authorization.Middlewares;
+using Pek.Permissions.Authorization.Policies;
+using Pek.Permissions.Identity.JwtBearer;
+using Pek.Permissions.Identity.JwtBearer.Internal;
 
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 
 using Pek.Security;
 
-namespace DH.Permissions.Extensions;
+namespace Pek.Permissions.Extensions;
 
 /// <summary>
 /// 扩展服务

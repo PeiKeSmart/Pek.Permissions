@@ -1,4 +1,4 @@
-﻿namespace DH.Permissions.Identity.JwtBearer;
+﻿namespace Pek.Permissions.Identity.JwtBearer;
 
 /// <summary>
 /// 令牌Payload存储器

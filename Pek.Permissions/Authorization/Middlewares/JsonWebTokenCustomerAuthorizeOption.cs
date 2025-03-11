@@ -1,7 +1,7 @@
 ﻿using Pek;
 using Pek.Security;
 
-namespace DH.Permissions.Authorization.Middlewares;
+namespace Pek.Permissions.Authorization.Middlewares;
 
 /// <summary>
 /// Jwt客户授权配置

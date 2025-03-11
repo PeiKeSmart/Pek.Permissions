@@ -5,7 +5,7 @@ using Pek.Configs;
 using Pek.Infrastructure;
 using Pek.Security;
 
-namespace DH.Permissions.Identity.JwtBearer.Internal;
+namespace Pek.Permissions.Identity.JwtBearer.Internal;
 
 /// <summary>
 /// Jwt令牌存储器

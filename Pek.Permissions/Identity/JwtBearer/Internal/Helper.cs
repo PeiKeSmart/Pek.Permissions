@@ -9,7 +9,7 @@ using NewLife.Web;
 
 using Pek.Security;
 
-namespace DH.Permissions.Identity.JwtBearer.Internal;
+namespace Pek.Permissions.Identity.JwtBearer.Internal;
 
 /// <summary>
 /// JwtBearer帮助类

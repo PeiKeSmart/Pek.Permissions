@@ -1,4 +1,4 @@
-﻿using DH.Permissions.Identity.JwtBearer;
+﻿using Pek.Permissions.Identity.JwtBearer;
 
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc.Filters;
@@ -8,7 +8,7 @@ using Pek;
 using Pek.Helpers;
 using Pek.Security;
 
-namespace DH.Permissions.Authorization.Policies;
+namespace Pek.Permissions.Authorization.Policies;
 
 /// <summary>
 /// Jwt授权处理器
