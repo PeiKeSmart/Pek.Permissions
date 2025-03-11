@@ -44,18 +44,9 @@ public class PekJwtBearerHandler : AuthenticationHandler<PekJwtBearerOptions>
             Secret = ss[1],
         };
 
-        XTrace.WriteLine($"鉴权进来：PekJwtBearerHandler：{token}:{jwt.TryDecode(token, out _)}");
-
         if (!jwt.TryDecode(token, out _)) return AuthenticateResult.Fail("Invalid token signature.");
 
-        XTrace.WriteLine($"鉴权进来：PekJwtBearerHandler11111：{jwt.Items.ToJson()}");
-
         var claims = Helper.ToClaims(jwt.Items);
-        if (claims == null || !claims.Any())
-        {
-            XTrace.WriteLine("No valid claims found in token.");
-        }
-
         var claimsPrincipal = new ClaimsPrincipal(new ClaimsIdentity(claims, "jwt"));
 
         Context.Items["jwt-Authorization"] = token;
