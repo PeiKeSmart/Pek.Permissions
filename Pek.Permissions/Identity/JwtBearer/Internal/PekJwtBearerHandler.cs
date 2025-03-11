@@ -1,12 +1,11 @@
 ﻿using System.Security.Claims;
 using System.Text.Encodings.Web;
 
-using Pek.Permissions.Identity.JwtBearer.Internal;
-
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.Extensions.Options;
 
 using NewLife;
+using NewLife.Log;
 using NewLife.Web;
 
 using Pek.Permissions.Identity.Options;
@@ -26,6 +25,7 @@ public class PekJwtBearerHandler : AuthenticationHandler<PekJwtBearerOptions>
 
     protected override async Task<AuthenticateResult> HandleAuthenticateAsync()
     {
+        XTrace.WriteLine($"鉴权进来：PekJwtBearerHandler");
         if (_jwtOptions.Secret.IsNullOrWhiteSpace()) return AuthenticateResult.Fail("Secret is null.");
 
         if (!Request.Headers.TryGetValue("Authorization", out var authorizationHeader)) return AuthenticateResult.NoResult();
