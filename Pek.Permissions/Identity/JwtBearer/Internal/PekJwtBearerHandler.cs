@@ -10,6 +10,7 @@ using NewLife.Web;
 
 using Pek.Permissions.Identity.Options;
 using Pek.Security;
+using Pek.Webs;
 
 namespace Pek.Permissions.Identity.JwtBearer.Internal;
 
@@ -25,7 +26,7 @@ public class PekJwtBearerHandler : AuthenticationHandler<PekJwtBearerOptions>
 
     protected override async Task<AuthenticateResult> HandleAuthenticateAsync()
     {
-        XTrace.WriteLine($"鉴权进来：PekJwtBearerHandler");
+        XTrace.WriteLine($"鉴权进来：PekJwtBearerHandler：{Request.GetRawUrl()}");
         if (_jwtOptions.Secret.IsNullOrWhiteSpace()) return AuthenticateResult.Fail("Secret is null.");
 
         if (!Request.Headers.TryGetValue("Authorization", out var authorizationHeader)) return AuthenticateResult.NoResult();
