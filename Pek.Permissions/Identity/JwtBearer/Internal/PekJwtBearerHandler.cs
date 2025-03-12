@@ -27,9 +27,8 @@ public class PekJwtBearerHandler : AuthenticationHandler<PekJwtBearerOptions>
 
     protected override async Task<AuthenticateResult> HandleAuthenticateAsync()
     {
-        XTrace.WriteLine($"鉴权进来：PekJwtBearerHandler：{Request.GetRawUrl()}");
         if (_jwtOptions.Secret.IsNullOrWhiteSpace()) return AuthenticateResult.Fail("Secret is null.");
-        XTrace.WriteLine($"鉴权进来：PekJwtBearerHandler222222222222：{Request.GetRawUrl()}");
+
         if (!Request.Headers.TryGetValue("Authorization", out var authorizationHeader))
         {
             var query = Microsoft.AspNetCore.WebUtilities.QueryHelpers.ParseQuery(Request.QueryString.Value);
@@ -38,7 +37,7 @@ public class PekJwtBearerHandler : AuthenticationHandler<PekJwtBearerOptions>
                 return AuthenticateResult.NoResult();
             }
         }
-        XTrace.WriteLine($"鉴权进来：PekJwtBearerHandler333333333333：{Request.GetRawUrl()}");
+
         var token = authorizationHeader.ToString().Replace("Bearer ", String.Empty).Trim();
 
         if (token.IsNullOrWhiteSpace()) return AuthenticateResult.NoResult();
