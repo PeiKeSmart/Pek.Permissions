@@ -45,6 +45,8 @@ public class PekJwtBearerHandler : AuthenticationHandler<PekJwtBearerOptions>
 
         // 解码令牌
         var ss = _jwtOptions.Secret.Split(':');
+        if (ss.Length < 2) return AuthenticateResult.Fail("Invalid secret format.");
+
         var jwt = new JwtBuilder
         {
             Algorithm = ss[0],
