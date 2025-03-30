@@ -3,7 +3,6 @@
 using NewLife;
 using NewLife.Web;
 
-using Pek;
 using Pek.Exceptions;
 using Pek.Helpers;
 using Pek.Security;
@@ -123,9 +122,9 @@ internal sealed class JsonWebTokenBuilder : IJsonWebTokenBuilder
         var accessToken = new JsonWebToken()
         {
             AccessToken = token,
-            AccessTokenUtcExpires = Conv.To<long>(accessExpires.ToJsGetTime()),
+            AccessTokenUtcExpires = Conv.CTo<Int64>(accessExpires.ToJsGetTime()),
             RefreshToken = refreshToken,
-            RefreshUtcExpires = Conv.To<long>(refreshExpires.ToJsGetTime())
+            RefreshUtcExpires = Conv.CTo<Int64>(refreshExpires.ToJsGetTime())
         };
         _tokenStore.SaveToken(accessToken, accessExpires);
 
