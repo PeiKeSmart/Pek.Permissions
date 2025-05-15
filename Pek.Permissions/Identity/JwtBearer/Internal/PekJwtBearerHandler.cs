@@ -5,13 +5,10 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.Extensions.Options;
 
 using NewLife;
-using NewLife.Log;
-using NewLife.Serialization;
 using NewLife.Web;
 
 using Pek.Permissions.Identity.Options;
 using Pek.Security;
-using Pek.Webs;
 
 namespace Pek.Permissions.Identity.JwtBearer.Internal;
 

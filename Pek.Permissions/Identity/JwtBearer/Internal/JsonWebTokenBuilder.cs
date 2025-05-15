@@ -1,6 +1,8 @@
 ﻿using Microsoft.Extensions.Options;
 
 using NewLife;
+using NewLife.Log;
+using NewLife.Serialization;
 using NewLife.Web;
 
 using Pek.Exceptions;
@@ -84,11 +86,17 @@ internal sealed class JsonWebTokenBuilder : IJsonWebTokenBuilder
         if (options.Secret.IsNullOrWhiteSpace())
             throw new ArgumentNullException(nameof(options.Secret),
                 $@"{nameof(options.Secret)}为Null或空字符串。请在""appsettings.json""配置""{nameof(JwtOptions)}""节点及其子节点""{nameof(JwtOptions.Secret)}""");
-        var clientId = payload.ContainsKey("clientId") ? payload["clientId"] : Guid.NewGuid().ToString();
-        var clientType = payload.ContainsKey("clientType") ? payload["clientType"] : "admin";
+
+        XTrace.WriteLine($"获取到的负载：{payload.ToJson()}");
+
+        var clientId = payload.TryGetValue("clientId", out var ClientId) ? ClientId : Guid.NewGuid().ToString();
+        var clientType = payload.TryGetValue("clientType", out var ClientType) ? ClientType : "admin";
+
         var userId = GetUserId(payload);
-        if (userId.IsEmpty())
-            throw new ArgumentException("不存在用户标识");
+        if (userId.IsEmpty()) throw new ArgumentException("不存在用户标识");
+
+        if (!payload.TryGetValue("From", out var From)) throw new ArgumentException("不包含来源标识");
+
         var claims = Helper.ToClaims(payload);
 
         var ss = options.Secret.Split(':');
@@ -100,9 +108,8 @@ internal sealed class JsonWebTokenBuilder : IJsonWebTokenBuilder
 
             Algorithm = ss[0],
             Secret = ss[1],
+            Expire = DateTime.Now.AddMinutes(options.RefreshExpireMinutes)
         };
-
-        jwt.Expire = DateTime.Now.AddMinutes(options.RefreshExpireMinutes);
         var refreshToken = jwt.Encode(payload);
         var refreshExpires = jwt.Expire;
 

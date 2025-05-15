@@ -1,7 +1,6 @@
-﻿using Pek.Permissions.Identity.JwtBearer;
+﻿using Microsoft.Extensions.Options;
 
-using Microsoft.Extensions.Options;
-
+using Pek.Permissions.Identity.JwtBearer;
 using Pek.Security;
 
 namespace Pek.Permissions.Authorization.Middlewares;
@@ -29,7 +28,7 @@ public class JsonWebTokenCustomerAuthorizeMiddleware
     /// <summary>
     /// 匿名访问路径列表
     /// </summary>
-    private readonly IList<string> _anonymousPathList;
+    private readonly IList<String> _anonymousPathList;
 
     /// <summary>
     /// Jwt令牌校验器

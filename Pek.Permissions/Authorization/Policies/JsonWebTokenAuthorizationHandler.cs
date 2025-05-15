@@ -82,13 +82,13 @@ public class JsonWebTokenAuthorizationHandler : AuthorizationHandler<JsonWebToke
         if (!_tokenValidator.Validate(token, _options, requirement.ValidatePayload))
             throw new UnauthorizedAccessException("验证失败，请查看传递的参数是否正确或是否有权限访问该地址。");
 
-        // 兼容旧版本：校验From字段（两者都为空则跳过校验）
+        // 兼容旧版本：校验From字段
         var payload = DHWeb.HttpContext.Items["jwt-payload"] as IDictionary<String, Object>;
         var endpoint = httpContext.GetEndpoint();
         var fromAttribute = endpoint?.Metadata.GetMetadata<JwtAuthorizeAttribute>();
         var requiredFrom = fromAttribute?.From;
         var tokenFrom = payload.TryGetValue("From", out var fromObj) ? fromObj as String : String.Empty;
-        if (!requiredFrom.IsNullOrWhiteSpace() || !tokenFrom.IsNullOrWhiteSpace())
+        if (!requiredFrom.IsNullOrWhiteSpace())
         {
             if (!String.Equals(tokenFrom, requiredFrom, StringComparison.OrdinalIgnoreCase))
             {
@@ -142,12 +142,12 @@ public class JsonWebTokenAuthorizationHandler : AuthorizationHandler<JsonWebToke
         }
         var payload = DHWeb.HttpContext.Items["jwt-payload"] as IDictionary<String, Object>;
 
-        // 兼容旧版本：校验From字段（两者都为空则跳过校验）
+        // 兼容旧版本：校验From字段
         var endpoint = httpContext.GetEndpoint();
         var fromAttribute = endpoint?.Metadata.GetMetadata<JwtAuthorizeAttribute>();
         var requiredFrom = fromAttribute?.From;
         var tokenFrom = payload.TryGetValue("From", out var fromObj) ? fromObj as String : String.Empty;
-        if (!requiredFrom.IsNullOrWhiteSpace() || !tokenFrom.IsNullOrWhiteSpace())
+        if (!requiredFrom.IsNullOrWhiteSpace())
         {
             if (!String.Equals(tokenFrom, requiredFrom, StringComparison.OrdinalIgnoreCase))
             {
