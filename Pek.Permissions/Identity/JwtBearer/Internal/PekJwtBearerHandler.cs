@@ -2,11 +2,13 @@
 using System.Text.Encodings.Web;
 
 using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
 
 using NewLife;
 using NewLife.Web;
 
+using Pek.Permissions.Authorization;
 using Pek.Permissions.Identity.Options;
 using Pek.Security;
 
@@ -60,5 +62,53 @@ public class PekJwtBearerHandler : AuthenticationHandler<PekJwtBearerOptions>
 
         var ticket = new AuthenticationTicket(claimsPrincipal, Scheme.Name);
         return AuthenticateResult.Success(ticket);
+    }
+
+    /// <summary>
+    /// 处理认证挑战（401 未授权）
+    /// </summary>
+    /// <param name="properties">认证属性</param>
+    /// <returns></returns>
+    protected override async Task HandleChallengeAsync(AuthenticationProperties properties)
+    {
+        Response.StatusCode = 401;
+        Response.ContentType = "application/json; charset=utf-8";
+
+        // 从 HttpContext 中获取具体的失败原因和错误码
+        var failureReason = Context.Items["AuthFailureReason"]?.ToString();
+        var failureCode = Context.Items["AuthFailureCode"];
+
+        var result = new AuthorizeResult();
+        result.Message = failureReason ?? "未授权访问，请先登录";
+        result.ErrCode = failureCode is int code ? code : 40001;
+
+        await result.ExecuteResultAsync(new ActionContext
+        {
+            HttpContext = Context
+        }).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// 处理禁止访问（403 权限不足）
+    /// </summary>
+    /// <param name="properties">认证属性</param>
+    /// <returns></returns>
+    protected override async Task HandleForbiddenAsync(AuthenticationProperties properties)
+    {
+        Response.StatusCode = 403;
+        Response.ContentType = "application/json; charset=utf-8";
+
+        // 从 HttpContext 中获取具体的失败原因和错误码
+        var failureReason = Context.Items["AuthFailureReason"]?.ToString();
+        var failureCode = Context.Items["AuthFailureCode"];
+
+        var result = new AuthorizeResult();
+        result.Message = failureReason ?? "权限不足，禁止访问";
+        result.ErrCode = failureCode is int code ? code : 40301;
+
+        await result.ExecuteResultAsync(new ActionContext
+        {
+            HttpContext = Context
+        }).ConfigureAwait(false);
     }
 }

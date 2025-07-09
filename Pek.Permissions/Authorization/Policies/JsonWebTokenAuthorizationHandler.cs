@@ -125,11 +125,16 @@ public class JsonWebTokenAuthorizationHandler : AuthorizationHandler<JsonWebToke
         var token = authorizationHeader.Trim();
         if (!_tokenStore.ExistsToken(token))
         {
+            // 设置具体的失败原因到 HttpContext，供 Challenge 处理器使用
+            httpContext.Items["AuthFailureReason"] = "Token不存在或已失效";
+            httpContext.Items["AuthFailureCode"] = 40001;
             context.Fail();
             return;
         }
         if (!_tokenValidator.Validate(token, _options, requirement.ValidatePayload))
         {
+            httpContext.Items["AuthFailureReason"] = "Token验证失败";
+            httpContext.Items["AuthFailureCode"] = 40002;
             context.Fail();
             return;
         }
@@ -137,6 +142,8 @@ public class JsonWebTokenAuthorizationHandler : AuthorizationHandler<JsonWebToke
         var accessToken = _tokenStore.GetToken(token);
         if (accessToken.IsExpired())
         {
+            httpContext.Items["AuthFailureReason"] = "Token已过期";
+            httpContext.Items["AuthFailureCode"] = 40003;
             context.Fail();
             return;
         }
@@ -151,6 +158,8 @@ public class JsonWebTokenAuthorizationHandler : AuthorizationHandler<JsonWebToke
         {
             if (!String.Equals(tokenFrom, requiredFrom, StringComparison.OrdinalIgnoreCase))
             {
+                httpContext.Items["AuthFailureReason"] = $"Token来源不符，要求From={requiredFrom}，实际From={tokenFrom}";
+                httpContext.Items["AuthFailureCode"] = 40301;
                 context.Fail();
                 return;
             }
@@ -162,6 +171,8 @@ public class JsonWebTokenAuthorizationHandler : AuthorizationHandler<JsonWebToke
             var bindDeviceInfo = _tokenStore.GetUserDeviceToken(payload["sub"].SafeString(), payload["clientType"].SafeString());
             if (bindDeviceInfo.DeviceId != payload["clientId"].SafeString())
             {
+                httpContext.Items["AuthFailureReason"] = "该账号已在其它设备登录";
+                httpContext.Items["AuthFailureCode"] = 40004;
                 context.Fail();
                 return;
             }
