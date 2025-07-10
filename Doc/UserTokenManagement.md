@@ -169,14 +169,88 @@ jwt:token:bind_user:{userId}:{clientType}  # 用户设备绑定
 - ✅ RefreshToken处理机制完全保留
 - ✅ 渐进式实施，可选择性使用新功能
 
+## 并发安全实现
+
+### MemoryCache 环境下的并发安全
+
+由于 MemoryCache 环境下 `HashSet<String>` 不是线程安全的，我们采用以下策略保证并发安全：
+
+1. **用户级别信号量**：为每个用户维护独立的 `SemaphoreSlim`，避免不同用户间的锁竞争
+2. **轻量级锁设计**：使用 `SemaphoreSlim` 而非 `lock` 语句，内存占用更小，性能更好
+3. **锁粒度优化**：锁定范围仅限于单个用户的 Token 集合操作，最小化锁持有时间
+4. **内存优化**：当用户无Token时自动清理对应的信号量，避免内存泄漏
+
+```csharp
+// 用户级别信号量管理
+private readonly Dictionary<String, SemaphoreSlim> _userTokenSemaphores = new();
+private readonly SemaphoreSlim _semaphoreDict = new(1, 1);
+
+// 获取用户专用信号量
+private SemaphoreSlim GetUserSemaphore(String userId)
+{
+    _semaphoreDict.Wait();
+    try
+    {
+        if (!_userTokenSemaphores.TryGetValue(userId, out var semaphore))
+        {
+            semaphore = new SemaphoreSlim(1, 1);
+            _userTokenSemaphores[userId] = semaphore;
+        }
+        return semaphore;
+    }
+    finally
+    {
+        _semaphoreDict.Release();
+    }
+}
+
+// 使用示例：带锁的Token操作
+public void AddUserToken(String userId, String accessToken, DateTime expires)
+{
+    var userSemaphore = GetUserSemaphore(userId);
+    userSemaphore.Wait();
+    try
+    {
+        var userTokensKey = GetUserTokensKey(userId);
+        var existingTokens = _cache.Get<HashSet<String>>(userTokensKey) ?? [];
+        existingTokens.Add(accessToken);
+        _cache.Set(userTokensKey, existingTokens, expires.Add(TimeSpan.FromHours(1)).Subtract(DateTime.UtcNow));
+    }
+    finally
+    {
+        userSemaphore.Release();
+    }
+}
+```
+
+### Redis 环境下的原生安全
+
+Redis 环境下可直接使用原生的 Set 操作（SADD、SREM、SMEMBERS），天然支持并发安全：
+
+- `SADD jwt:user:tokens:{userId} {accessToken}` - 添加 Token
+- `SREM jwt:user:tokens:{userId} {accessToken}` - 移除 Token  
+- `SMEMBERS jwt:user:tokens:{userId}` - 获取所有 Token
+- `DEL jwt:user:tokens:{userId}` - 清空用户 Token
+
+### 并发控制策略对比
+
+| 方案 | 优势 | 劣势 | 适用场景 |
+|------|------|------|----------|
+| Dictionary + lock | 实现简单 | 重量级，内存占用大 | 低并发场景 |
+| SemaphoreSlim | 轻量级，支持异步 | 需要手动内存管理 | **推荐方案** |
+| Redis 原生命令 | 天然线程安全，高性能 | 依赖Redis | Redis环境 |
+| 分段锁 | 更高并发度 | 实现复杂 | 极高并发场景 |
+
 ## 性能考虑
 
 - 用户Token列表使用 `HashSet<String>` 存储，查询效率 O(1)
 - 自动清理过期Token，避免内存泄漏
 - 延时删除机制保持不变
+- 信号量级别的锁控制，最小化锁竞争
 
 ## 安全特性
 
 - 日志中使用Token哈希值，避免敏感信息泄露
 - 支持强制下线和精确Token撤销
 - 可扩展并发登录限制和异常检测功能
+- 并发安全的Token集合管理，避免竞态条件
