@@ -136,6 +136,9 @@ internal sealed class JsonWebTokenBuilder : IJsonWebTokenBuilder
         };
         _tokenStore.SaveToken(accessToken, accessExpires);
 
+        // 【新增】建立用户Token关联
+        _tokenStore.AddUserToken(userId, token, accessExpires);
+
         // 绑定用户设备令牌
         _tokenStore.BindUserDeviceToken(userId, clientType, new DeviceTokenBindInfo()
         {

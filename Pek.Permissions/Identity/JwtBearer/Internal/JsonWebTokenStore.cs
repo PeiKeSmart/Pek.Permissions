@@ -100,6 +100,16 @@ internal sealed class JsonWebTokenStore : IJsonWebTokenStore
     {
         if (!_cache.ContainsKey(GetTokenKey(token)))
             return;
+            
+        // 获取token信息以找到userId
+        var jsonWebToken = _cache.Get<JsonWebToken>(GetTokenKey(token));
+        if (jsonWebToken != null)
+        {
+            var userId = jsonWebToken.UId.ToString();
+            // 清理用户Token关联
+            RemoveUserToken(userId, token);
+        }
+        
         _cache.Remove(GetTokenKey(token));
     }
 
@@ -114,6 +124,15 @@ internal sealed class JsonWebTokenStore : IJsonWebTokenStore
 
         if (!_cache.ContainsKey(key))
             return;
+
+        // 获取token信息以找到userId（延时移除时也需要清理用户关联）
+        var jsonWebToken = _cache.Get<JsonWebToken>(key);
+        if (jsonWebToken != null)
+        {
+            var userId = jsonWebToken.UId.ToString();
+            // 立即清理用户Token关联（不延时）
+            RemoveUserToken(userId, token);
+        }
 
         _cache.SetExpire(key, TimeSpan.FromSeconds(expire));
     }
@@ -179,4 +198,127 @@ internal sealed class JsonWebTokenStore : IJsonWebTokenStore
     /// <param name="clientType">客户端类型</param>
     private static String GetBindUserDeviceTokenKey(String userId, String clientType) =>
         $"jwt:token:bind_user:{userId}:{clientType}";
+
+    #region 用户Token管理
+
+    /// <summary>
+    /// 添加用户Token关联
+    /// </summary>
+    /// <param name="userId">用户标识</param>
+    /// <param name="accessToken">访问令牌</param>
+    /// <param name="expires">过期时间</param>
+    public void AddUserToken(String userId, String accessToken, DateTime expires)
+    {
+        var userTokensKey = GetUserTokensKey(userId);
+        
+        // 获取现有的token列表
+        var existingTokens = _cache.Get<HashSet<String>>(userTokensKey) ?? [];
+        existingTokens.Add(accessToken);
+        
+        // 保存更新后的token列表
+        _cache.Set(userTokensKey, existingTokens, expires.Add(TimeSpan.FromHours(1)).Subtract(DateTime.UtcNow));
+    }
+
+    /// <summary>
+    /// 移除用户Token关联
+    /// </summary>
+    /// <param name="userId">用户标识</param>
+    /// <param name="accessToken">访问令牌</param>
+    public void RemoveUserToken(String userId, String accessToken)
+    {
+        var userTokensKey = GetUserTokensKey(userId);
+        var existingTokens = _cache.Get<HashSet<String>>(userTokensKey);
+        
+        if (existingTokens != null)
+        {
+            existingTokens.Remove(accessToken);
+            
+            if (existingTokens.Count > 0)
+            {
+                _cache.Set(userTokensKey, existingTokens);
+            }
+            else
+            {
+                _cache.Remove(userTokensKey);
+            }
+        }
+    }
+
+    /// <summary>
+    /// 获取用户的所有AccessToken
+    /// </summary>
+    /// <param name="userId">用户标识</param>
+    public IEnumerable<String> GetUserAccessTokens(String userId)
+    {
+        var userTokensKey = GetUserTokensKey(userId);
+        var tokens = _cache.Get<HashSet<String>>(userTokensKey) ?? new HashSet<String>();
+        
+        // 过滤掉已过期的token
+        var validTokens = new HashSet<String>();
+        var hasExpiredTokens = false;
+        
+        foreach (var token in tokens)
+        {
+            if (_cache.ContainsKey(GetTokenKey(token)))
+            {
+                validTokens.Add(token);
+            }
+            else
+            {
+                hasExpiredTokens = true;
+            }
+        }
+        
+        // 如果有过期token，更新缓存
+        if (hasExpiredTokens && validTokens.Count != tokens.Count)
+        {
+            if (validTokens.Count > 0)
+            {
+                _cache.Set(userTokensKey, validTokens);
+            }
+            else
+            {
+                _cache.Remove(userTokensKey);
+            }
+        }
+        
+        return validTokens;
+    }
+
+    /// <summary>
+    /// 移除用户的所有Token
+    /// </summary>
+    /// <param name="userId">用户标识</param>
+    public void RemoveAllUserTokens(String userId)
+    {
+        var tokens = GetUserAccessTokens(userId);
+        
+        foreach (var accessToken in tokens)
+        {
+            // 获取对应的JsonWebToken对象
+            var jsonWebToken = GetToken(accessToken);
+            if (jsonWebToken != null)
+            {
+                // 删除AccessToken
+                RemoveToken(accessToken);
+                
+                // 删除对应的RefreshToken
+                if (!String.IsNullOrEmpty(jsonWebToken.RefreshToken))
+                {
+                    RemoveRefreshToken(jsonWebToken.RefreshToken);
+                }
+            }
+        }
+        
+        // 清空用户Token列表
+        _cache.Remove(GetUserTokensKey(userId));
+    }
+
+    /// <summary>
+    /// 获取用户Token列表缓存键
+    /// </summary>
+    /// <param name="userId">用户标识</param>
+    private static String GetUserTokensKey(String userId) => $"jwt:user:tokens:{userId}";
+
+    #endregion
 }

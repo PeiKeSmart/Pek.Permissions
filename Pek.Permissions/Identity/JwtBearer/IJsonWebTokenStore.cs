@@ -79,4 +79,35 @@ public interface IJsonWebTokenStore
     /// <param name="userId">用户标识</param>
     /// <param name="clientType">客户端类型</param>
     DeviceTokenBindInfo GetUserDeviceToken(String userId, String clientType);
+
+    #region 用户Token管理
+
+    /// <summary>
+    /// 添加用户Token关联
+    /// </summary>
+    /// <param name="userId">用户标识</param>
+    /// <param name="accessToken">访问令牌</param>
+    /// <param name="expires">过期时间</param>
+    void AddUserToken(String userId, String accessToken, DateTime expires);
+
+    /// <summary>
+    /// 移除用户Token关联
+    /// </summary>
+    /// <param name="userId">用户标识</param>
+    /// <param name="accessToken">访问令牌</param>
+    void RemoveUserToken(String userId, String accessToken);
+
+    /// <summary>
+    /// 获取用户的所有AccessToken
+    /// </summary>
+    /// <param name="userId">用户标识</param>
+    IEnumerable<String> GetUserAccessTokens(String userId);
+
+    /// <summary>
+    /// 移除用户的所有Token
+    /// </summary>
+    /// <param name="userId">用户标识</param>
+    void RemoveAllUserTokens(String userId);
+
+    #endregion
 }

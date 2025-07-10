@@ -78,6 +78,8 @@ public static partial class Extensions
         services.TryAddSingleton<IJsonWebTokenCustomerAuthorizeOption, JsonWebTokenCustomerAuthorizeOption>();
         services.TryAddSingleton<IJsonWebTokenAuthorizationRequirement, JsonWebTokenAuthorizationRequirement>();
         services.TryAddSingleton<ITokenPayloadStore, TokenPayloadStore>();
+        // 【新增】用户Token管理服务
+        services.TryAddSingleton<IUserTokenService, UserTokenService>();
         services.AddSingleton<IAuthorizationHandler, JsonWebTokenAuthorizationHandler>();
     }
 
