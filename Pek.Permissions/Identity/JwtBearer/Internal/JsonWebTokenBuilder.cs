@@ -1,4 +1,4 @@
-﻿using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Options;
 
 using NewLife;
 using NewLife.Log;
@@ -131,7 +131,8 @@ internal sealed class JsonWebTokenBuilder : IJsonWebTokenBuilder
             AccessToken = token,
             AccessTokenUtcExpires = Conv.CTo<Int64>(accessExpires.ToJsGetTime()),
             RefreshToken = refreshToken,
-            RefreshUtcExpires = Conv.CTo<Int64>(refreshExpires.ToJsGetTime())
+            RefreshUtcExpires = Conv.CTo<Int64>(refreshExpires.ToJsGetTime()),
+            UId = Conv.CTo<Int32>(userId)
         };
         _tokenStore.SaveToken(accessToken, accessExpires);
 
