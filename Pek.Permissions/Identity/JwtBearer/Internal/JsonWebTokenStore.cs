@@ -1,4 +1,5 @@
 ﻿using NewLife.Caching;
+using NewLife.Log;
 
 using Pek.Security;
 
@@ -27,6 +28,9 @@ internal sealed class JsonWebTokenStore : IJsonWebTokenStore
     public JsonWebTokenStore(ICacheProvider cacheProvider)
     {
         _cache = cacheProvider.Cache;
+
+        XTrace.WriteLine($"获取到的数据：{_cache.Name}");
+
         //if (RedisSetting.Current.RedisEnabled)
         //{
         //    _cache = Singleton<FullRedis>.Instance;
