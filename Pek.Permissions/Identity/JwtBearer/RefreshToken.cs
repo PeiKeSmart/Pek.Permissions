@@ -9,12 +9,12 @@ public class RefreshToken
     /// <summary>
     /// 客户端ID
     /// </summary>
-    public string ClientId { get; set; }
+    public String ClientId { get; set; }
 
     /// <summary>
     /// 标识值
     /// </summary>
-    public string Value { get; set; }
+    public String Value { get; set; }
 
     /// <summary>
     /// 过期时间
