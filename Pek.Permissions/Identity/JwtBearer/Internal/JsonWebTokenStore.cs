@@ -16,6 +16,11 @@ internal sealed class JsonWebTokenStore : IJsonWebTokenStore
     private readonly ICache _cache;
 
     /// <summary>
+    /// 是否使用Redis缓存
+    /// </summary>
+    private readonly Boolean IsRedis;
+
+    /// <summary>
     /// 用户Token集合操作信号量（针对MemoryCache下的HashSet并发安全）
     /// </summary>
     private readonly Dictionary<String, SemaphoreSlim> _userTokenSemaphores = new();
@@ -29,7 +34,10 @@ internal sealed class JsonWebTokenStore : IJsonWebTokenStore
     {
         _cache = cacheProvider.Cache;
 
-        XTrace.WriteLine($"获取到的数据：{_cache.Name}");
+        if (_cache.Name.EqualsIgnoreCase("RedisCache"))
+        {
+            IsRedis = true;
+        }
 
         //if (RedisSetting.Current.RedisEnabled)
         //{
