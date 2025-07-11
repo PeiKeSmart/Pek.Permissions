@@ -1,5 +1,4 @@
 ﻿using NewLife.Caching;
-using NewLife.Log;
 
 using Pek.Security;
 
@@ -18,7 +17,7 @@ internal sealed class JsonWebTokenStore : IJsonWebTokenStore
     /// <summary>
     /// 是否使用Redis缓存
     /// </summary>
-    private readonly Boolean IsRedis;
+    private readonly Boolean _isRedis;
 
     /// <summary>
     /// 用户Token集合操作信号量（针对MemoryCache下的HashSet并发安全）
@@ -34,10 +33,7 @@ internal sealed class JsonWebTokenStore : IJsonWebTokenStore
     {
         _cache = cacheProvider.Cache;
 
-        if (_cache.Name.EqualsIgnoreCase("RedisCache"))
-        {
-            IsRedis = true;
-        }
+        _isRedis = _cache.Name.EqualsIgnoreCase("RedisCache");
 
         //if (RedisSetting.Current.RedisEnabled)
         //{
@@ -164,6 +160,12 @@ internal sealed class JsonWebTokenStore : IJsonWebTokenStore
     {
         _cache.Set(GetTokenKey(token.AccessToken), token, expires.Subtract(DateTime.UtcNow));
         _cache.Set(GetBindRefreshTokenKey(token.RefreshToken), token, expires.Subtract(DateTime.UtcNow));
+        
+        // 添加用户Token关联
+        if (token.UId > 0)
+        {
+            AddUserToken(token.UId.ToString(), token.AccessToken, expires);
+        }
     }
 
     /// <summary>
@@ -275,6 +277,195 @@ internal sealed class JsonWebTokenStore : IJsonWebTokenStore
     /// <param name="expires">过期时间</param>
     public void AddUserToken(String userId, String accessToken, DateTime expires)
     {
+        if (_isRedis)
+        {
+            AddUserTokenForRedis(userId, accessToken, expires);
+        }
+        else
+        {
+            AddUserTokenForMemory(userId, accessToken, expires);
+        }
+    }
+
+    /// <summary>
+    /// 移除用户Token关联
+    /// </summary>
+    /// <param name="userId">用户标识</param>
+    /// <param name="accessToken">访问令牌</param>
+    public void RemoveUserToken(String userId, String accessToken)
+    {
+        if (_isRedis)
+        {
+            RemoveUserTokenForRedis(userId, accessToken);
+        }
+        else
+        {
+            RemoveUserTokenForMemory(userId, accessToken);
+        }
+    }
+
+    /// <summary>
+    /// 获取用户的所有AccessToken
+    /// </summary>
+    /// <param name="userId">用户标识</param>
+    public IEnumerable<String> GetUserAccessTokens(String userId)
+    {
+        if (_isRedis)
+        {
+            return GetUserAccessTokensForRedis(userId);
+        }
+        else
+        {
+            return GetUserAccessTokensForMemory(userId);
+        }
+    }
+
+    /// <summary>
+    /// 移除用户的所有Token
+    /// </summary>
+    /// <param name="userId">用户标识</param>
+    public void RemoveAllUserTokens(String userId)
+    {
+        if (_isRedis)
+        {
+            RemoveAllUserTokensForRedis(userId);
+        }
+        else
+        {
+            RemoveAllUserTokensForMemory(userId);
+        }
+    }
+
+    #region Redis模式实现
+
+    /// <summary>
+    /// Redis模式：添加用户Token关联
+    /// </summary>
+    /// <param name="userId">用户标识</param>
+    /// <param name="accessToken">访问令牌</param>
+    /// <param name="expires">过期时间</param>
+    private void AddUserTokenForRedis(String userId, String accessToken, DateTime expires)
+    {
+        var userTokensKey = GetUserTokensKey(userId);
+        
+        // Redis模式下，我们使用Set集合存储用户Token
+        // 由于NewLife.Caching的统一接口，我们可以通过Set操作来实现
+        var existingTokens = _cache.Get<HashSet<String>>(userTokensKey) ?? new HashSet<String>();
+        existingTokens.Add(accessToken);
+        
+        // 保存更新后的token列表，设置稍长的过期时间
+        var expireTime = expires.Add(TimeSpan.FromHours(1)).Subtract(DateTime.UtcNow);
+        _cache.Set(userTokensKey, existingTokens, expireTime);
+    }
+
+    /// <summary>
+    /// Redis模式：移除用户Token关联
+    /// </summary>
+    /// <param name="userId">用户标识</param>
+    /// <param name="accessToken">访问令牌</param>
+    private void RemoveUserTokenForRedis(String userId, String accessToken)
+    {
+        var userTokensKey = GetUserTokensKey(userId);
+        var existingTokens = _cache.Get<HashSet<String>>(userTokensKey);
+        
+        if (existingTokens != null)
+        {
+            existingTokens.Remove(accessToken);
+            
+            if (existingTokens.Count > 0)
+            {
+                _cache.Set(userTokensKey, existingTokens);
+            }
+            else
+            {
+                _cache.Remove(userTokensKey);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Redis模式：获取用户的所有AccessToken
+    /// </summary>
+    /// <param name="userId">用户标识</param>
+    /// <returns>Token列表</returns>
+    private IEnumerable<String> GetUserAccessTokensForRedis(String userId)
+    {
+        var userTokensKey = GetUserTokensKey(userId);
+        var tokens = _cache.Get<HashSet<String>>(userTokensKey) ?? new HashSet<String>();
+        
+        // 过滤掉已过期的token
+        var validTokens = new HashSet<String>();
+        var hasExpiredTokens = false;
+        
+        foreach (var token in tokens)
+        {
+            if (_cache.ContainsKey(GetTokenKey(token)))
+            {
+                validTokens.Add(token);
+            }
+            else
+            {
+                hasExpiredTokens = true;
+            }
+        }
+        
+        // 如果有过期token，更新缓存
+        if (hasExpiredTokens && validTokens.Count != tokens.Count)
+        {
+            if (validTokens.Count > 0)
+            {
+                _cache.Set(userTokensKey, validTokens);
+            }
+            else
+            {
+                _cache.Remove(userTokensKey);
+            }
+        }
+        
+        return validTokens.ToList();
+    }
+
+    /// <summary>
+    /// Redis模式：移除用户的所有Token
+    /// </summary>
+    /// <param name="userId">用户标识</param>
+    private void RemoveAllUserTokensForRedis(String userId)
+    {
+        var tokens = GetUserAccessTokensForRedis(userId);
+        
+        foreach (var accessToken in tokens)
+        {
+            // 获取对应的JsonWebToken对象
+            var jsonWebToken = GetToken(accessToken);
+            if (jsonWebToken != null)
+            {
+                // 删除AccessToken
+                RemoveToken(accessToken);
+                
+                // 删除对应的RefreshToken
+                if (!String.IsNullOrEmpty(jsonWebToken.RefreshToken))
+                {
+                    RemoveRefreshToken(jsonWebToken.RefreshToken);
+                }
+            }
+        }
+        
+        // 清空用户Token列表
+        _cache.Remove(GetUserTokensKey(userId));
+    }
+
+    #endregion
+
+    #region Memory模式实现
+
+    /// <summary>
+    /// Memory模式：添加用户Token关联
+    /// </summary>
+    /// <param name="userId">用户标识</param>
+    /// <param name="accessToken">访问令牌</param>
+    /// <param name="expires">过期时间</param>
+    private void AddUserTokenForMemory(String userId, String accessToken, DateTime expires)
+    {
         var userSemaphore = GetUserSemaphore(userId);
         userSemaphore.Wait();
         try
@@ -295,11 +486,11 @@ internal sealed class JsonWebTokenStore : IJsonWebTokenStore
     }
 
     /// <summary>
-    /// 移除用户Token关联
+    /// Memory模式：移除用户Token关联
     /// </summary>
     /// <param name="userId">用户标识</param>
     /// <param name="accessToken">访问令牌</param>
-    public void RemoveUserToken(String userId, String accessToken)
+    private void RemoveUserTokenForMemory(String userId, String accessToken)
     {
         var userSemaphore = GetUserSemaphore(userId);
         userSemaphore.Wait();
@@ -331,10 +522,11 @@ internal sealed class JsonWebTokenStore : IJsonWebTokenStore
     }
 
     /// <summary>
-    /// 获取用户的所有AccessToken
+    /// Memory模式：获取用户的所有AccessToken
     /// </summary>
     /// <param name="userId">用户标识</param>
-    public IEnumerable<String> GetUserAccessTokens(String userId)
+    /// <returns>Token列表</returns>
+    private IEnumerable<String> GetUserAccessTokensForMemory(String userId)
     {
         var userSemaphore = GetUserSemaphore(userId);
         userSemaphore.Wait();
@@ -383,16 +575,16 @@ internal sealed class JsonWebTokenStore : IJsonWebTokenStore
     }
 
     /// <summary>
-    /// 移除用户的所有Token
+    /// Memory模式：移除用户的所有Token
     /// </summary>
     /// <param name="userId">用户标识</param>
-    public void RemoveAllUserTokens(String userId)
+    private void RemoveAllUserTokensForMemory(String userId)
     {
         var userSemaphore = GetUserSemaphore(userId);
         userSemaphore.Wait();
         try
         {
-            var tokens = GetUserAccessTokensInternal(userId); // 内部方法，避免重复加锁
+            var tokens = GetUserAccessTokensForMemoryInternal(userId); // 内部方法，避免重复加锁
             
             foreach (var accessToken in tokens)
             {
@@ -424,10 +616,11 @@ internal sealed class JsonWebTokenStore : IJsonWebTokenStore
     }
 
     /// <summary>
-    /// 获取用户的所有AccessToken（内部方法，不加锁）
+    /// Memory模式：获取用户的所有AccessToken（内部方法，不加锁）
     /// </summary>
     /// <param name="userId">用户标识</param>
-    private IEnumerable<String> GetUserAccessTokensInternal(String userId)
+    /// <returns>Token列表</returns>
+    private IEnumerable<String> GetUserAccessTokensForMemoryInternal(String userId)
     {
         var userTokensKey = GetUserTokensKey(userId);
         var tokens = _cache.Get<HashSet<String>>(userTokensKey) ?? new HashSet<String>();
@@ -463,6 +656,8 @@ internal sealed class JsonWebTokenStore : IJsonWebTokenStore
         
         return validTokens.ToList();
     }
+
+    #endregion
 
     /// <summary>
     /// 获取用户Token列表缓存键
