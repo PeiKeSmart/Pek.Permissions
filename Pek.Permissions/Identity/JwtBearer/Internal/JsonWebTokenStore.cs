@@ -33,7 +33,8 @@ internal sealed class JsonWebTokenStore : IJsonWebTokenStore
     {
         _cache = cacheProvider.Cache;
 
-        _isRedis = _cache.Name.EqualsIgnoreCase("RedisCache");
+        if (cacheProvider.Cache != cacheProvider.InnerCache && cacheProvider.Cache is not MemoryCache)
+            _isRedis = true;
 
         //if (RedisSetting.Current.RedisEnabled)
         //{
