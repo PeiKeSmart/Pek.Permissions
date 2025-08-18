@@ -113,18 +113,28 @@ internal sealed class JsonWebTokenStore : IJsonWebTokenStore
     /// <param name="token">访问令牌</param>
     public void RemoveToken(String token)
     {
+        RemoveTokenInternal(token, true);
+    }
+
+    /// <summary>
+    /// 内部移除访问令牌方法
+    /// </summary>
+    /// <param name="token">访问令牌</param>
+    /// <param name="removeUserAssociation">是否移除用户关联</param>
+    private void RemoveTokenInternal(String token, Boolean removeUserAssociation)
+    {
         if (!_cache.ContainsKey(GetTokenKey(token)))
             return;
-            
+
         // 获取token信息以找到userId
         var jsonWebToken = _cache.Get<JsonWebToken>(GetTokenKey(token));
-        if (jsonWebToken != null)
+        if (jsonWebToken != null && removeUserAssociation)
         {
             var userId = jsonWebToken.UId.ToString();
             // 清理用户Token关联
             RemoveUserToken(userId, token);
         }
-        
+
         _cache.Remove(GetTokenKey(token));
     }
 
@@ -440,8 +450,8 @@ internal sealed class JsonWebTokenStore : IJsonWebTokenStore
             var jsonWebToken = GetToken(accessToken);
             if (jsonWebToken != null)
             {
-                // 删除AccessToken
-                RemoveToken(accessToken);
+                // 删除AccessToken（不移除用户关联，避免递归）
+                RemoveTokenInternal(accessToken, false);
                 
                 // 删除对应的RefreshToken
                 if (!String.IsNullOrEmpty(jsonWebToken.RefreshToken))
@@ -593,8 +603,8 @@ internal sealed class JsonWebTokenStore : IJsonWebTokenStore
                 var jsonWebToken = GetToken(accessToken);
                 if (jsonWebToken != null)
                 {
-                    // 删除AccessToken
-                    RemoveToken(accessToken);
+                    // 删除AccessToken（不移除用户关联，避免递归）
+                    RemoveTokenInternal(accessToken, false);
                     
                     // 删除对应的RefreshToken
                     if (!String.IsNullOrEmpty(jsonWebToken.RefreshToken))
