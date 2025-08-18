@@ -4,6 +4,7 @@ using Pek.Permissions.Identity.JwtBearer;
 using Pek.Permissions.Identity.JwtBearer.Internal;
 
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 
 using Pek.Security;
@@ -72,6 +73,8 @@ public static partial class Extensions
     public static void AddJwt(this IServiceCollection services, Action<JwtOptions> jwtOptions)
     {
         services.Configure(jwtOptions);
+        // 【新增】注册HttpContextAccessor，用于设备ID验证
+        services.TryAddSingleton<IHttpContextAccessor, HttpContextAccessor>();
         services.TryAddSingleton<IJsonWebTokenBuilder, JsonWebTokenBuilder>();
         services.TryAddSingleton<IJsonWebTokenStore, JsonWebTokenStore>();
         services.TryAddSingleton<IJsonWebTokenValidator, JsonWebTokenValidator>();
