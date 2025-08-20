@@ -83,7 +83,7 @@ public class JsonWebTokenAuthorizationHandler : AuthorizationHandler<JsonWebToke
         var token = authorizationHeader.Trim();
 
         // 尝试从缓存获取Token信息，避免重复验证
-        var cacheKey = $"CachedTokenInfo_{token.GetHashCode()}";
+        var cacheKey = CachedTokenInfo.GetCacheKey(token);
         CachedTokenInfo? cachedTokenInfo = null;
         if (httpContext.Items.TryGetValue(cacheKey, out var cachedObj) && cachedObj is CachedTokenInfo cached && cached.IsCacheValid)
         {
@@ -167,7 +167,7 @@ public class JsonWebTokenAuthorizationHandler : AuthorizationHandler<JsonWebToke
         var token = authorizationHeader.Trim();
 
         // 尝试从缓存获取Token信息
-        var cacheKey = $"CachedTokenInfo_{token.GetHashCode()}";
+        var cacheKey = CachedTokenInfo.GetCacheKey(token);
         CachedTokenInfo? cachedTokenInfo = null;
         if (httpContext.Items.TryGetValue(cacheKey, out var cachedObj) && cachedObj is CachedTokenInfo cached && cached.IsCacheValid)
         {

@@ -24,7 +24,7 @@ internal sealed class JsonWebTokenValidator : IJsonWebTokenValidator
         if (httpContext == null) return false;
 
         // 尝试从缓存中获取已解码的Token信息
-        var cacheKey = $"CachedTokenInfo_{encodeJwt.GetHashCode()}";
+        var cacheKey = CachedTokenInfo.GetCacheKey(encodeJwt);
         if (httpContext.Items.TryGetValue(cacheKey, out var cachedObj) && cachedObj is CachedTokenInfo cachedInfo && cachedInfo.IsCacheValid)
         {
             // 使用缓存的解码信息，避免重复解码
@@ -46,12 +46,6 @@ internal sealed class JsonWebTokenValidator : IJsonWebTokenValidator
         if (jwtArray.Length < 3)
             return false;
 
-        var header = jwtArray[0].ToBase64().ToStr().DecodeJson();
-        var payload = jwtArray[1].ToBase64().ToStr().DecodeJson();
-
-        httpContext.Items["jwt-header"] = header;
-        httpContext.Items["jwt-payload"] = payload;
-
         // 验证签名（如果配置了Secret）
         if (!options.Secret.IsNullOrWhiteSpace())
         {
@@ -67,6 +61,13 @@ internal sealed class JsonWebTokenValidator : IJsonWebTokenValidator
                     return false;
             }
         }
+
+        // 在签名验证通过后再解析Header和Payload，避免无效Token的解析开销
+        var header = jwtArray[0].ToBase64().ToStr().DecodeJson();
+        var payload = jwtArray[1].ToBase64().ToStr().DecodeJson();
+
+        httpContext.Items["jwt-header"] = header;
+        httpContext.Items["jwt-payload"] = payload;
 
         return validatePayload(payload, options);
     }

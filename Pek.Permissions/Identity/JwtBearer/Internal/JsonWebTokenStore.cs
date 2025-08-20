@@ -215,20 +215,15 @@ internal sealed class JsonWebTokenStore : IJsonWebTokenStore
     {
         var result = new CompleteTokenInfo();
 
-        // 检查Token是否存在
-        result.TokenExists = ExistsToken(token);
-        if (!result.TokenExists)
-        {
-            return result;
-        }
-
-        // 获取访问令牌信息
+        // 直接获取访问令牌信息，避免重复查询
         result.AccessToken = GetToken(token);
         if (result.AccessToken == null)
         {
             result.TokenExists = false;
             return result;
         }
+
+        result.TokenExists = true;
 
         // 检查是否过期
         result.IsExpired = result.AccessToken.IsExpired();

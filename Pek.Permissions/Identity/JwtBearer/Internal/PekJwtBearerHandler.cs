@@ -39,12 +39,16 @@ public class PekJwtBearerHandler : AuthenticationHandler<PekJwtBearerOptions>
             }
         }
 
-        var token = authorizationHeader.ToString().Replace("Bearer ", String.Empty).Trim();
+        // 优化Token提取，避免不必要的字符串操作
+        var authHeaderStr = authorizationHeader.ToString();
+        var token = authHeaderStr.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase)
+            ? authHeaderStr.Substring(7).Trim()
+            : authHeaderStr.Trim();
 
         if (token.IsNullOrWhiteSpace()) return AuthenticateResult.NoResult();
 
         // 检查是否已有缓存的Token信息
-        var cacheKey = $"CachedTokenInfo_{token.GetHashCode()}";
+        var cacheKey = CachedTokenInfo.GetCacheKey(token);
         if (Context.Items.TryGetValue(cacheKey, out var cachedObj) && cachedObj is CachedTokenInfo cachedInfo && cachedInfo.IsCacheValid)
         {
             // 使用缓存的Token信息
@@ -56,6 +60,10 @@ public class PekJwtBearerHandler : AuthenticationHandler<PekJwtBearerOptions>
             var ticket = new AuthenticationTicket(cachedInfo.ClaimsPrincipal, Scheme.Name);
             return AuthenticateResult.Success(ticket);
         }
+
+        // 预先分割Token，避免重复操作
+        var jwtArray = token.Split('.');
+        if (jwtArray.Length < 3) return AuthenticateResult.Fail("Invalid token format.");
 
         // 解码令牌
         var ss = _jwtOptions.Secret.Split(':');
@@ -69,10 +77,9 @@ public class PekJwtBearerHandler : AuthenticationHandler<PekJwtBearerOptions>
 
         if (!jwt.TryDecode(token, out _)) return AuthenticateResult.Fail("Invalid token signature.");
 
-        // 解析Header和Payload
-        var jwtArray = token.Split('.');
-        var header = jwtArray.Length > 0 ? jwtArray[0].ToBase64().ToStr().DecodeJson() : new Dictionary<string, object>();
-        var payload = jwtArray.Length > 1 ? jwtArray[1].ToBase64().ToStr().DecodeJson() : new Dictionary<string, object>();
+        // 利用已分割的Token解析Header和Payload，避免重复分割
+        var header = jwtArray[0].ToBase64().ToStr().DecodeJson();
+        var payload = jwtArray[1].ToBase64().ToStr().DecodeJson();
 
         var claims = Helper.ToClaims(jwt.Items);
         var claimsPrincipal = new ClaimsPrincipal(new ClaimsIdentity(claims, "jwt"));

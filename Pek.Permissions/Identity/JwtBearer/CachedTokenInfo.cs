@@ -47,4 +47,11 @@ public class CachedTokenInfo
     /// 检查缓存是否仍然有效（避免长时间缓存过期Token）
     /// </summary>
     public bool IsCacheValid => DateTime.UtcNow.Subtract(DecodedAt).TotalMinutes < 5;
+
+    /// <summary>
+    /// 生成缓存键，避免重复字符串拼接
+    /// </summary>
+    /// <param name="token">Token字符串</param>
+    /// <returns>缓存键</returns>
+    public static string GetCacheKey(string token) => $"CachedTokenInfo_{token.GetHashCode()}";
 }
