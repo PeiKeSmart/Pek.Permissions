@@ -213,6 +213,14 @@ internal sealed class JsonWebTokenStore : IJsonWebTokenStore
     /// <returns>完整的Token信息</returns>
     public CompleteTokenInfo GetCompleteTokenInfo(String token, String? userId = null, String? clientType = null)
     {
+        // 检查是否有缓存的完整Token信息
+        var completeInfoCacheKey = $"CompleteTokenInfo_{token.GetHashCode()}";
+        if (_cache.TryGetValue<CompleteTokenInfo>(completeInfoCacheKey, out var cachedCompleteInfo) &&
+            cachedCompleteInfo != null && cachedCompleteInfo.IsCacheValid)
+        {
+            return cachedCompleteInfo;
+        }
+
         var result = new CompleteTokenInfo();
 
         // 直接获取访问令牌信息，避免重复查询
@@ -247,6 +255,9 @@ internal sealed class JsonWebTokenStore : IJsonWebTokenStore
                 result.DeviceId = result.DeviceBindInfo.DeviceId;
             }
         }
+
+        // 缓存完整Token信息（短时间缓存，避免重复查询）
+        _cache.Set(completeInfoCacheKey, result, TimeSpan.FromMinutes(2));
 
         return result;
     }

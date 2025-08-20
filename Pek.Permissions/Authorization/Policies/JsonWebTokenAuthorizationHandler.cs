@@ -193,27 +193,26 @@ public class JsonWebTokenAuthorizationHandler : AuthorizationHandler<JsonWebToke
             return;
         }
 
-        // 如果有缓存的Token信息且已验证过签名，跳过重复验证
-        if (cachedTokenInfo?.IsSignatureValid != true)
+        // 统一的验证逻辑，减少重复代码
+        bool isValidationPassed = false;
+
+        if (cachedTokenInfo?.IsSignatureValid == true && cachedTokenInfo.Payload != null)
         {
-            if (!_tokenValidator.Validate(token, _options, requirement.ValidatePayload))
-            {
-                httpContext.Items["AuthFailureReason"] = "Token验证失败";
-                httpContext.Items["AuthFailureCode"] = 40002;
-                context.Fail();
-                return;
-            }
+            // 使用缓存的Payload信息，只进行自定义验证
+            isValidationPassed = requirement.ValidatePayload(cachedTokenInfo.Payload, _options);
         }
         else
         {
-            // 使用缓存的Payload信息，只进行自定义验证
-            if (cachedTokenInfo.Payload != null && !requirement.ValidatePayload(cachedTokenInfo.Payload, _options))
-            {
-                httpContext.Items["AuthFailureReason"] = "Token验证失败";
-                httpContext.Items["AuthFailureCode"] = 40002;
-                context.Fail();
-                return;
-            }
+            // 进行完整验证
+            isValidationPassed = _tokenValidator.Validate(token, _options, requirement.ValidatePayload);
+        }
+
+        if (!isValidationPassed)
+        {
+            httpContext.Items["AuthFailureReason"] = "Token验证失败";
+            httpContext.Items["AuthFailureCode"] = 40002;
+            context.Fail();
+            return;
         }
 
         // 检查Token是否过期

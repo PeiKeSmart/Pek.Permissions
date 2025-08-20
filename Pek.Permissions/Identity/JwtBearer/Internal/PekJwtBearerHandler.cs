@@ -65,24 +65,19 @@ public class PekJwtBearerHandler : AuthenticationHandler<PekJwtBearerOptions>
         var jwtArray = token.Split('.');
         if (jwtArray.Length < 3) return AuthenticateResult.Fail("Invalid token format.");
 
-        // 解码令牌
-        var ss = _jwtOptions.Secret.Split(':');
-        if (ss.Length < 2) return AuthenticateResult.Fail("Invalid secret format.");
-
-        var jwt = new JwtBuilder
-        {
-            Algorithm = ss[0],
-            Secret = ss[1],
-        };
+        // 使用工厂方法创建JWT构建器
+        var jwt = JwtBuilderFactory.CreateBuilder(_jwtOptions.Secret);
+        if (jwt == null) return AuthenticateResult.Fail("Invalid secret format.");
 
         if (!jwt.TryDecode(token, out _)) return AuthenticateResult.Fail("Invalid token signature.");
 
-        // 利用已分割的Token解析Header和Payload，避免重复分割
-        var header = jwtArray[0].ToBase64().ToStr().DecodeJson();
-        var payload = jwtArray[1].ToBase64().ToStr().DecodeJson();
-
+        // 直接使用jwt.Items中的解码结果，避免重复解析
         var claims = Helper.ToClaims(jwt.Items);
         var claimsPrincipal = new ClaimsPrincipal(new ClaimsIdentity(claims, "jwt"));
+
+        // 解析Header和Payload（用于缓存和后续使用）
+        var header = jwtArray[0].ToBase64().ToStr().DecodeJson();
+        var payload = jwtArray[1].ToBase64().ToStr().DecodeJson();
 
         // 创建并缓存Token信息
         var tokenInfo = new CachedTokenInfo

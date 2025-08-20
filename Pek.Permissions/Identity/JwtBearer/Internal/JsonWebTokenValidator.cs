@@ -49,17 +49,8 @@ internal sealed class JsonWebTokenValidator : IJsonWebTokenValidator
         // 验证签名（如果配置了Secret）
         if (!options.Secret.IsNullOrWhiteSpace())
         {
-            var ss = options.Secret.Split(':');
-            if (ss.Length >= 2)
-            {
-                var jwt = new JwtBuilder
-                {
-                    Algorithm = ss[0],
-                    Secret = ss[1],
-                };
-                if (!jwt.TryDecode(encodeJwt, out _))
-                    return false;
-            }
+            if (!JwtBuilderFactory.ValidateSignature(encodeJwt, options.Secret))
+                return false;
         }
 
         // 在签名验证通过后再解析Header和Payload，避免无效Token的解析开销
