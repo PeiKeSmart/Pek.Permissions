@@ -215,8 +215,8 @@ internal sealed class JsonWebTokenStore : IJsonWebTokenStore
     {
         // 检查是否有缓存的完整Token信息
         var completeInfoCacheKey = $"CompleteTokenInfo_{token.GetHashCode()}";
-        if (_cache.TryGetValue<CompleteTokenInfo>(completeInfoCacheKey, out var cachedCompleteInfo) &&
-            cachedCompleteInfo != null && cachedCompleteInfo.IsCacheValid)
+        var cachedCompleteInfo = _cache.Get<CompleteTokenInfo>(completeInfoCacheKey);
+        if (cachedCompleteInfo != null && cachedCompleteInfo.IsCacheValid)
         {
             return cachedCompleteInfo;
         }

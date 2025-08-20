@@ -57,8 +57,7 @@ public class PekJwtBearerHandler : AuthenticationHandler<PekJwtBearerOptions>
             Context.Items["jwt-payload"] = cachedInfo.Payload;
 
             await Task.CompletedTask.ConfigureAwait(false);
-            var ticket = new AuthenticationTicket(cachedInfo.ClaimsPrincipal, Scheme.Name);
-            return AuthenticateResult.Success(ticket);
+            return AuthenticateResult.Success(new AuthenticationTicket(cachedInfo.ClaimsPrincipal, Scheme.Name));
         }
 
         // 预先分割Token，避免重复操作
