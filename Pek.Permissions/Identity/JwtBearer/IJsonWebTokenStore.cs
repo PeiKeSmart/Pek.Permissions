@@ -80,6 +80,15 @@ public interface IJsonWebTokenStore
     /// <param name="clientType">客户端类型</param>
     DeviceTokenBindInfo GetUserDeviceToken(String userId, String clientType);
 
+    /// <summary>
+    /// 一次性获取完整的Token信息，减少多次缓存查询
+    /// </summary>
+    /// <param name="token">访问令牌</param>
+    /// <param name="userId">用户ID（可选，如果已知可提高性能）</param>
+    /// <param name="clientType">客户端类型（可选，如果已知可提高性能）</param>
+    /// <returns>完整的Token信息</returns>
+    CompleteTokenInfo GetCompleteTokenInfo(String token, String? userId = null, String? clientType = null);
+
     #region 用户Token管理
 
     /// <summary>

@@ -1,4 +1,5 @@
-﻿using NewLife.Caching;
+﻿using System.Collections.Concurrent;
+using NewLife.Caching;
 
 using Pek.Security;
 
@@ -20,10 +21,9 @@ internal sealed class JsonWebTokenStore : IJsonWebTokenStore
     private readonly Boolean _isRedis;
 
     /// <summary>
-    /// 用户Token集合操作信号量（针对MemoryCache下的HashSet并发安全）
+    /// 用户Token集合（使用ConcurrentDictionary简化并发控制）
     /// </summary>
-    private readonly Dictionary<String, SemaphoreSlim> _userTokenSemaphores = new();
-    private readonly SemaphoreSlim _semaphoreDict = new(1, 1);
+    private readonly ConcurrentDictionary<String, ConcurrentBag<String>> _userTokensMemory = new();
 
     /// <summary>
     /// 初始化一个<see cref="JsonWebTokenStore"/>类型的实例
@@ -205,6 +205,58 @@ internal sealed class JsonWebTokenStore : IJsonWebTokenStore
         _cache.Get<DeviceTokenBindInfo>(GetBindUserDeviceTokenKey(userId, clientType));
 
     /// <summary>
+    /// 一次性获取完整的Token信息，减少多次缓存查询
+    /// </summary>
+    /// <param name="token">访问令牌</param>
+    /// <param name="userId">用户ID（可选，如果已知可提高性能）</param>
+    /// <param name="clientType">客户端类型（可选，如果已知可提高性能）</param>
+    /// <returns>完整的Token信息</returns>
+    public CompleteTokenInfo GetCompleteTokenInfo(String token, String? userId = null, String? clientType = null)
+    {
+        var result = new CompleteTokenInfo();
+
+        // 检查Token是否存在
+        result.TokenExists = ExistsToken(token);
+        if (!result.TokenExists)
+        {
+            return result;
+        }
+
+        // 获取访问令牌信息
+        result.AccessToken = GetToken(token);
+        if (result.AccessToken == null)
+        {
+            result.TokenExists = false;
+            return result;
+        }
+
+        // 检查是否过期
+        result.IsExpired = result.AccessToken.IsExpired();
+
+        // 从Token中提取用户信息
+        result.UserId = userId ?? result.AccessToken.UId.ToString();
+
+        // 如果有刷新令牌，获取刷新令牌信息
+        if (!String.IsNullOrEmpty(result.AccessToken.RefreshToken))
+        {
+            result.RefreshToken = GetRefreshToken(result.AccessToken.RefreshToken);
+        }
+
+        // 如果提供了clientType或能从其他地方获取，获取设备绑定信息
+        if (!String.IsNullOrEmpty(clientType) && !String.IsNullOrEmpty(result.UserId))
+        {
+            result.ClientType = clientType;
+            result.DeviceBindInfo = GetUserDeviceToken(result.UserId, clientType);
+            if (result.DeviceBindInfo != null)
+            {
+                result.DeviceId = result.DeviceBindInfo.DeviceId;
+            }
+        }
+
+        return result;
+    }
+
+    /// <summary>
     /// 获取刷新令牌缓存键
     /// </summary>
     /// <param name="token">刷新令牌</param>
@@ -231,54 +283,6 @@ internal sealed class JsonWebTokenStore : IJsonWebTokenStore
         $"jwt:token:bind_user:{userId}:{clientType}";
 
     #region 用户Token管理
-
-    /// <summary>
-    /// 获取用户级别的信号量，用于保证Token集合操作的并发安全
-    /// </summary>
-    /// <param name="userId">用户ID</param>
-    /// <returns>用户专用的信号量</returns>
-    private SemaphoreSlim GetUserSemaphore(String userId)
-    {
-        _semaphoreDict.Wait();
-        try
-        {
-            if (!_userTokenSemaphores.TryGetValue(userId, out var semaphore))
-            {
-                semaphore = new SemaphoreSlim(1, 1);
-                _userTokenSemaphores[userId] = semaphore;
-            }
-            return semaphore;
-        }
-        finally
-        {
-            _semaphoreDict.Release();
-        }
-    }
-
-    /// <summary>
-    /// 清理未使用的用户信号量（可选的内存优化）
-    /// </summary>
-    /// <param name="userId">用户ID</param>
-    private void CleanupUserSemaphore(String userId)
-    {
-        _semaphoreDict.Wait();
-        try
-        {
-            if (_userTokenSemaphores.TryGetValue(userId, out var semaphore))
-            {
-                // 检查是否有等待的线程，如果没有则可以安全移除
-                if (semaphore.CurrentCount == 1)
-                {
-                    _userTokenSemaphores.Remove(userId);
-                    semaphore.Dispose();
-                }
-            }
-        }
-        finally
-        {
-            _semaphoreDict.Release();
-        }
-    }
 
     /// <summary>
     /// 添加用户Token关联
@@ -477,23 +481,16 @@ internal sealed class JsonWebTokenStore : IJsonWebTokenStore
     /// <param name="expires">过期时间</param>
     private void AddUserTokenForMemory(String userId, String accessToken, DateTime expires)
     {
-        var userSemaphore = GetUserSemaphore(userId);
-        userSemaphore.Wait();
-        try
-        {
-            var userTokensKey = GetUserTokensKey(userId);
-            
-            // 获取现有的token列表
-            var existingTokens = _cache.Get<HashSet<String>>(userTokensKey) ?? [];
-            existingTokens.Add(accessToken);
-            
-            // 保存更新后的token列表
-            _cache.Set(userTokensKey, existingTokens, expires.Add(TimeSpan.FromHours(1)).Subtract(DateTime.UtcNow));
-        }
-        finally
-        {
-            userSemaphore.Release();
-        }
+        // 使用ConcurrentDictionary简化并发控制
+        _userTokensMemory.AddOrUpdate(userId,
+            new ConcurrentBag<String> { accessToken },
+            (key, existing) => { existing.Add(accessToken); return existing; });
+
+        // 同时保持缓存中的数据（用于过期管理）
+        var userTokensKey = GetUserTokensKey(userId);
+        var existingTokens = _cache.Get<HashSet<String>>(userTokensKey) ?? new HashSet<String>();
+        existingTokens.Add(accessToken);
+        _cache.Set(userTokensKey, existingTokens, expires.Add(TimeSpan.FromHours(1)).Subtract(DateTime.UtcNow));
     }
 
     /// <summary>
@@ -503,32 +500,45 @@ internal sealed class JsonWebTokenStore : IJsonWebTokenStore
     /// <param name="accessToken">访问令牌</param>
     private void RemoveUserTokenForMemory(String userId, String accessToken)
     {
-        var userSemaphore = GetUserSemaphore(userId);
-        userSemaphore.Wait();
-        try
+        // 从内存集合中移除
+        if (_userTokensMemory.TryGetValue(userId, out var tokens))
         {
-            var userTokensKey = GetUserTokensKey(userId);
-            var existingTokens = _cache.Get<HashSet<String>>(userTokensKey);
-            
-            if (existingTokens != null)
+            // 由于ConcurrentBag不支持直接移除，我们重新创建一个不包含该token的集合
+            var newTokens = new ConcurrentBag<String>();
+            foreach (var token in tokens)
             {
-                existingTokens.Remove(accessToken);
-                
-                if (existingTokens.Count > 0)
+                if (token != accessToken)
                 {
-                    _cache.Set(userTokensKey, existingTokens);
-                }
-                else
-                {
-                    _cache.Remove(userTokensKey);
-                    // 当用户没有Token时，清理信号量（可选的内存优化）
-                    CleanupUserSemaphore(userId);
+                    newTokens.Add(token);
                 }
             }
+
+            if (newTokens.IsEmpty)
+            {
+                _userTokensMemory.TryRemove(userId, out _);
+            }
+            else
+            {
+                _userTokensMemory.TryUpdate(userId, newTokens, tokens);
+            }
         }
-        finally
+
+        // 同时更新缓存
+        var userTokensKey = GetUserTokensKey(userId);
+        var existingTokens = _cache.Get<HashSet<String>>(userTokensKey);
+
+        if (existingTokens != null)
         {
-            userSemaphore.Release();
+            existingTokens.Remove(accessToken);
+
+            if (existingTokens.Count > 0)
+            {
+                _cache.Set(userTokensKey, existingTokens);
+            }
+            else
+            {
+                _cache.Remove(userTokensKey);
+            }
         }
     }
 
@@ -539,108 +549,29 @@ internal sealed class JsonWebTokenStore : IJsonWebTokenStore
     /// <returns>Token列表</returns>
     private IEnumerable<String> GetUserAccessTokensForMemory(String userId)
     {
-        var userSemaphore = GetUserSemaphore(userId);
-        userSemaphore.Wait();
-        try
+        // 优先从内存集合获取
+        var memoryTokens = new List<String>();
+        if (_userTokensMemory.TryGetValue(userId, out var tokens))
         {
-            var userTokensKey = GetUserTokensKey(userId);
-            var tokens = _cache.Get<HashSet<String>>(userTokensKey) ?? new HashSet<String>();
-            
-            // 过滤掉已过期的token
-            var validTokens = new HashSet<String>();
-            var hasExpiredTokens = false;
-            
-            foreach (var token in tokens)
-            {
-                if (_cache.ContainsKey(GetTokenKey(token)))
-                {
-                    validTokens.Add(token);
-                }
-                else
-                {
-                    hasExpiredTokens = true;
-                }
-            }
-            
-            // 如果有过期token，更新缓存
-            if (hasExpiredTokens && validTokens.Count != tokens.Count)
-            {
-                if (validTokens.Count > 0)
-                {
-                    _cache.Set(userTokensKey, validTokens);
-                }
-                else
-                {
-                    _cache.Remove(userTokensKey);
-                    // 当用户没有Token时，清理信号量（可选的内存优化）
-                    CleanupUserSemaphore(userId);
-                }
-            }
-            
-            return validTokens.ToList(); // 返回副本避免外部修改
+            memoryTokens.AddRange(tokens);
         }
-        finally
-        {
-            userSemaphore.Release();
-        }
-    }
 
-    /// <summary>
-    /// Memory模式：移除用户的所有Token
-    /// </summary>
-    /// <param name="userId">用户标识</param>
-    private void RemoveAllUserTokensForMemory(String userId)
-    {
-        var userSemaphore = GetUserSemaphore(userId);
-        userSemaphore.Wait();
-        try
-        {
-            var tokens = GetUserAccessTokensForMemoryInternal(userId); // 内部方法，避免重复加锁
-            
-            foreach (var accessToken in tokens)
-            {
-                // 获取对应的JsonWebToken对象
-                var jsonWebToken = GetToken(accessToken);
-                if (jsonWebToken != null)
-                {
-                    // 删除AccessToken（不移除用户关联，避免递归）
-                    RemoveTokenInternal(accessToken, false);
-                    
-                    // 删除对应的RefreshToken
-                    if (!String.IsNullOrEmpty(jsonWebToken.RefreshToken))
-                    {
-                        RemoveRefreshToken(jsonWebToken.RefreshToken);
-                    }
-                }
-            }
-            
-            // 清空用户Token列表
-            _cache.Remove(GetUserTokensKey(userId));
-            
-            // 清理信号量（可选的内存优化）
-            CleanupUserSemaphore(userId);
-        }
-        finally
-        {
-            userSemaphore.Release();
-        }
-    }
-
-    /// <summary>
-    /// Memory模式：获取用户的所有AccessToken（内部方法，不加锁）
-    /// </summary>
-    /// <param name="userId">用户标识</param>
-    /// <returns>Token列表</returns>
-    private IEnumerable<String> GetUserAccessTokensForMemoryInternal(String userId)
-    {
+        // 从缓存获取（用于验证和补充）
         var userTokensKey = GetUserTokensKey(userId);
-        var tokens = _cache.Get<HashSet<String>>(userTokensKey) ?? new HashSet<String>();
-        
+        var cachedTokens = _cache.Get<HashSet<String>>(userTokensKey) ?? new HashSet<String>();
+
+        // 合并两个来源的token
+        var allTokens = new HashSet<String>(memoryTokens);
+        foreach (var token in cachedTokens)
+        {
+            allTokens.Add(token);
+        }
+
         // 过滤掉已过期的token
         var validTokens = new HashSet<String>();
         var hasExpiredTokens = false;
-        
-        foreach (var token in tokens)
+
+        foreach (var token in allTokens)
         {
             if (_cache.ContainsKey(GetTokenKey(token)))
             {
@@ -651,22 +582,56 @@ internal sealed class JsonWebTokenStore : IJsonWebTokenStore
                 hasExpiredTokens = true;
             }
         }
-        
-        // 如果有过期token，更新缓存
-        if (hasExpiredTokens && validTokens.Count != tokens.Count)
+
+        // 如果有过期token，更新缓存和内存集合
+        if (hasExpiredTokens && validTokens.Count != allTokens.Count)
         {
             if (validTokens.Count > 0)
             {
                 _cache.Set(userTokensKey, validTokens);
+                _userTokensMemory.TryUpdate(userId, new ConcurrentBag<String>(validTokens), tokens);
             }
             else
             {
                 _cache.Remove(userTokensKey);
+                _userTokensMemory.TryRemove(userId, out _);
             }
         }
-        
+
         return validTokens.ToList();
     }
+
+    /// <summary>
+    /// Memory模式：移除用户的所有Token
+    /// </summary>
+    /// <param name="userId">用户标识</param>
+    private void RemoveAllUserTokensForMemory(String userId)
+    {
+        var tokens = GetUserAccessTokensForMemory(userId);
+
+        foreach (var accessToken in tokens)
+        {
+            // 获取对应的JsonWebToken对象
+            var jsonWebToken = GetToken(accessToken);
+            if (jsonWebToken != null)
+            {
+                // 删除AccessToken（不移除用户关联，避免递归）
+                RemoveTokenInternal(accessToken, false);
+
+                // 删除对应的RefreshToken
+                if (!String.IsNullOrEmpty(jsonWebToken.RefreshToken))
+                {
+                    RemoveRefreshToken(jsonWebToken.RefreshToken);
+                }
+            }
+        }
+
+        // 清空用户Token列表
+        _cache.Remove(GetUserTokensKey(userId));
+        _userTokensMemory.TryRemove(userId, out _);
+    }
+
+
 
     #endregion
 

@@ -1,5 +1,6 @@
 ﻿using NewLife;
 using NewLife.Serialization;
+using NewLife.Web;
 
 using Pek.Helpers;
 using Pek.Security;
@@ -19,43 +20,54 @@ internal sealed class JsonWebTokenValidator : IJsonWebTokenValidator
     /// <param name="validatePayload">校验负载</param>
     public Boolean Validate(String encodeJwt, JwtOptions options, Func<IDictionary<String, Object>, JwtOptions, Boolean> validatePayload)
     {
-        //if (options.Secret.IsNullOrWhiteSpace())
-        //    throw new ArgumentNullException(nameof(options.Secret),
-        //        $@"{nameof(options.Secret)}为Null或空字符串。请在""appsettings.json""配置""{nameof(JwtOptions)}""节点及其子节点""{nameof(JwtOptions.Secret)}""");
+        var httpContext = DHWeb.HttpContext;
+        if (httpContext == null) return false;
+
+        // 尝试从缓存中获取已解码的Token信息
+        var cacheKey = $"CachedTokenInfo_{encodeJwt.GetHashCode()}";
+        if (httpContext.Items.TryGetValue(cacheKey, out var cachedObj) && cachedObj is CachedTokenInfo cachedInfo && cachedInfo.IsCacheValid)
+        {
+            // 使用缓存的解码信息，避免重复解码
+            if (cachedInfo.Header != null && cachedInfo.Payload != null)
+            {
+                httpContext.Items["jwt-header"] = cachedInfo.Header;
+                httpContext.Items["jwt-payload"] = cachedInfo.Payload;
+
+                // 如果已经验证过签名，直接进行自定义验证
+                if (cachedInfo.IsSignatureValid)
+                {
+                    return validatePayload(cachedInfo.Payload, options);
+                }
+            }
+        }
+
+        // 如果没有缓存信息，进行完整验证
         var jwtArray = encodeJwt.Split('.');
         if (jwtArray.Length < 3)
             return false;
+
         var header = jwtArray[0].ToBase64().ToStr().DecodeJson();
         var payload = jwtArray[1].ToBase64().ToStr().DecodeJson();
 
-        DHWeb.HttpContext.Items["jwt-header"] = header;
-        DHWeb.HttpContext.Items["jwt-payload"] = payload;
+        httpContext.Items["jwt-header"] = header;
+        httpContext.Items["jwt-payload"] = payload;
 
-        //// 首先验证签名是否正确
-        //var ss = options.Secret.Split(':');
-        //var jwt = new JwtBuilder
-        //{
-        //    Algorithm = ss[0],
-        //    Secret = ss[1],
-        //};
-        //if (!jwt.TryDecode(encodeJwt, out _))
-        //    return false;
+        // 验证签名（如果配置了Secret）
+        if (!options.Secret.IsNullOrWhiteSpace())
+        {
+            var ss = options.Secret.Split(':');
+            if (ss.Length >= 2)
+            {
+                var jwt = new JwtBuilder
+                {
+                    Algorithm = ss[0],
+                    Secret = ss[1],
+                };
+                if (!jwt.TryDecode(encodeJwt, out _))
+                    return false;
+            }
+        }
 
-        //var claims = Helper.ToClaims(jwt.Items);
-        //DHWeb.HttpContext.User = new ClaimsPrincipal(new ClaimsIdentity(claims, "jwt"));
-
-        //var hs256 = new HMACSHA256(Encoding.UTF8.GetBytes(options.Secret));
-        //var sign = Base64UrlEncoder.Encode(
-        //    hs256.ComputeHash(Encoding.UTF8.GetBytes(string.Concat(jwtArray[0], ".", jwtArray[1]))));
-        //// 签名不正确直接返回
-        //if (!string.Equals(jwtArray[2], sign))
-        //    return false;
-        //// 其次验证是否在有效期内
-        ////var now = ToUnixEpochDate(DateTime.UtcNow);
-        ////if (!(now >= long.Parse(payload["nbf"].ToString()) && now < long.Parse(payload["exp"].ToString())))
-        ////    return false;
-        //// 进行自定义验证
-        
         return validatePayload(payload, options);
     }
 }

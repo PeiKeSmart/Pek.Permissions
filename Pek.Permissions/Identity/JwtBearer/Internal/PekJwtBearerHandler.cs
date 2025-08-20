@@ -7,8 +7,10 @@ using Microsoft.Extensions.Options;
 
 using NewLife;
 using NewLife.Web;
+using NewLife.Serialization;
 
 using Pek.Permissions.Authorization;
+using Pek.Permissions.Identity.JwtBearer;
 using Pek.Permissions.Identity.Options;
 using Pek.Security;
 
@@ -41,6 +43,20 @@ public class PekJwtBearerHandler : AuthenticationHandler<PekJwtBearerOptions>
 
         if (token.IsNullOrWhiteSpace()) return AuthenticateResult.NoResult();
 
+        // 检查是否已有缓存的Token信息
+        var cacheKey = $"CachedTokenInfo_{token.GetHashCode()}";
+        if (Context.Items.TryGetValue(cacheKey, out var cachedObj) && cachedObj is CachedTokenInfo cachedInfo && cachedInfo.IsCacheValid)
+        {
+            // 使用缓存的Token信息
+            Context.Items["jwt-Authorization"] = token;
+            Context.Items["jwt-header"] = cachedInfo.Header;
+            Context.Items["jwt-payload"] = cachedInfo.Payload;
+
+            await Task.CompletedTask.ConfigureAwait(false);
+            var ticket = new AuthenticationTicket(cachedInfo.ClaimsPrincipal, Scheme.Name);
+            return AuthenticateResult.Success(ticket);
+        }
+
         // 解码令牌
         var ss = _jwtOptions.Secret.Split(':');
         if (ss.Length < 2) return AuthenticateResult.Fail("Invalid secret format.");
@@ -53,10 +69,30 @@ public class PekJwtBearerHandler : AuthenticationHandler<PekJwtBearerOptions>
 
         if (!jwt.TryDecode(token, out _)) return AuthenticateResult.Fail("Invalid token signature.");
 
+        // 解析Header和Payload
+        var jwtArray = token.Split('.');
+        var header = jwtArray.Length > 0 ? jwtArray[0].ToBase64().ToStr().DecodeJson() : new Dictionary<string, object>();
+        var payload = jwtArray.Length > 1 ? jwtArray[1].ToBase64().ToStr().DecodeJson() : new Dictionary<string, object>();
+
         var claims = Helper.ToClaims(jwt.Items);
         var claimsPrincipal = new ClaimsPrincipal(new ClaimsIdentity(claims, "jwt"));
 
+        // 创建并缓存Token信息
+        var tokenInfo = new CachedTokenInfo
+        {
+            Token = token,
+            JwtBuilder = jwt,
+            ClaimsPrincipal = claimsPrincipal,
+            Header = header,
+            Payload = payload,
+            IsSignatureValid = true,
+            DecodedAt = DateTime.UtcNow
+        };
+
+        Context.Items[cacheKey] = tokenInfo;
         Context.Items["jwt-Authorization"] = token;
+        Context.Items["jwt-header"] = header;
+        Context.Items["jwt-payload"] = payload;
 
         await Task.CompletedTask.ConfigureAwait(false);
 
