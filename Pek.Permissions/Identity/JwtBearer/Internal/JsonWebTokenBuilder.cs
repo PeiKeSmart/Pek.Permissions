@@ -109,7 +109,7 @@ internal sealed class JsonWebTokenBuilder : IJsonWebTokenBuilder
         var userId = GetUserId(payload);
         if (userId.IsEmpty()) throw new ArgumentException("不存在用户标识");
 
-        // 验证clientId与真实设备ID的一致性
+        // 验证传入的clientId与真实设备ID的一致性（兼容旧约定）
         var clientId = payload.TryGetValue("clientId", out var ClientId) ? ClientId : realDeviceId;
 
         // 检查是否允许跨设备使用Token（测试环境开关）
@@ -125,8 +125,8 @@ internal sealed class JsonWebTokenBuilder : IJsonWebTokenBuilder
             XTrace.WriteLine($"[开发模式] 允许跨设备Token创建: clientId={clientId}, realDeviceId={realDeviceId}, userId={userId}");
         }
 
-        // 确保使用真实设备ID作为clientId
-        clientId = realDeviceId;
+        // 独立记录真实设备ID，避免覆盖调用方传入的clientId语义
+        payload["deviceId"] = realDeviceId;
         var clientType = payload.TryGetValue("clientType", out var ClientType) ? ClientType : "admin";
 
         if (!payload.TryGetValue("From", out var From)) throw new ArgumentException("不包含来源标识");
@@ -177,7 +177,7 @@ internal sealed class JsonWebTokenBuilder : IJsonWebTokenBuilder
         _tokenStore.BindUserDeviceToken(userId, clientType, new DeviceTokenBindInfo()
         {
             UserId = userId,
-            DeviceId = clientId,
+            DeviceId = realDeviceId,
             DeviceType = clientType,
             Token = accessToken,
         }, refreshExpires);

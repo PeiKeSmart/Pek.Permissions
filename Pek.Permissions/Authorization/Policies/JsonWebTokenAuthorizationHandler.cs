@@ -120,28 +120,37 @@ public class JsonWebTokenAuthorizationHandler : AuthorizationHandler<JsonWebToke
             }
         }
 
-        // 设备ID验证：验证Token中的clientId与当前设备ID是否一致
+        // 设备ID验证：严格要求Token携带deviceId，并与当前设备ID一致
         var currentDeviceId = DHWebHelper.FillDeviceId(httpContext);
-        var tokenClientId = payload?.TryGetValue("clientId", out var clientIdObj) == true ? clientIdObj as String : String.Empty;
+        var tokenDeviceId = payload?.TryGetValue("deviceId", out var deviceIdObj) == true ? deviceIdObj as String : String.Empty;
         var allowCrossDevice = PekSysSetting.Current.AllowJwtCrossDevice;
 
-        if (!currentDeviceId.IsNullOrEmpty() && !tokenClientId.IsNullOrEmpty() && tokenClientId != currentDeviceId && !allowCrossDevice)
+        if (!currentDeviceId.IsNullOrEmpty() && tokenDeviceId.IsNullOrEmpty())
+        {
+            throw new UnauthorizedAccessException("Token缺少设备标识，无法验证设备绑定");
+        }
+
+        if (!currentDeviceId.IsNullOrEmpty() && tokenDeviceId != currentDeviceId && !allowCrossDevice)
         {
             var userId = payload?.GetOrDefault("sub", "未知").ToString() ?? "未知";
-            SecurityLogger.LogDeviceIdMismatch(httpContext, tokenClientId, currentDeviceId, userId, new { Action = "TokenValidation", Method = "ThrowException" });
+            SecurityLogger.LogDeviceIdMismatch(httpContext, tokenDeviceId, currentDeviceId, userId, new { Action = "TokenValidation", Method = "ThrowException" });
             throw new UnauthorizedAccessException($"设备标识不匹配，Token无法在此设备使用");
         }
-        else if (!currentDeviceId.IsNullOrEmpty() && !tokenClientId.IsNullOrEmpty() && tokenClientId != currentDeviceId && allowCrossDevice)
+        else if (!currentDeviceId.IsNullOrEmpty() && tokenDeviceId != currentDeviceId && allowCrossDevice)
         {
             var userId = payload?.GetOrDefault("sub", "未知").ToString() ?? "未知";
-            XTrace.WriteLine($"[开发模式] 允许跨设备Token验证: tokenClientId={tokenClientId}, currentDeviceId={currentDeviceId}, userId={userId}");
+            XTrace.WriteLine($"[开发模式] 允许跨设备Token验证: tokenDeviceId={tokenDeviceId}, currentDeviceId={currentDeviceId}, userId={userId}");
         }
 
         // 单设备登录验证
         if (_options.SingleDeviceEnabled && payload != null)
         {
             var bindDeviceInfo = _tokenStore.GetUserDeviceToken(payload["sub"].SafeString(), payload["clientType"].SafeString());
-            if (bindDeviceInfo?.DeviceId != payload["clientId"].SafeString())
+            var payloadDeviceId = payload.TryGetValue("deviceId", out var payloadDeviceIdObj) ? payloadDeviceIdObj.SafeString() : String.Empty;
+            if (payloadDeviceId.IsNullOrEmpty())
+                throw new UnauthorizedAccessException("Token缺少设备标识，无法验证单设备登录");
+
+            if (bindDeviceInfo?.DeviceId != payloadDeviceId)
                 throw new UnauthorizedAccessException("该账号已在其它设备登录");
         }
         var isAuthenticated = httpContext.User.Identity?.IsAuthenticated == true;
@@ -240,30 +249,46 @@ public class JsonWebTokenAuthorizationHandler : AuthorizationHandler<JsonWebToke
             }
         }
 
-        // 设备ID验证：验证Token中的clientId与当前设备ID是否一致
+        // 设备ID验证：严格要求Token携带deviceId，并与当前设备ID一致
         var currentDeviceId = DHWebHelper.FillDeviceId(httpContext);
-        var tokenClientId = payload?.TryGetValue("clientId", out var clientIdObj) == true ? clientIdObj as String : String.Empty;
+        var tokenDeviceId = payload?.TryGetValue("deviceId", out var deviceIdObj) == true ? deviceIdObj as String : String.Empty;
         var allowCrossDevice = PekSysSetting.Current.AllowJwtCrossDevice;
 
-        if (!currentDeviceId.IsNullOrEmpty() && !tokenClientId.IsNullOrEmpty() && tokenClientId != currentDeviceId && !allowCrossDevice)
+        if (!currentDeviceId.IsNullOrEmpty() && tokenDeviceId.IsNullOrEmpty())
+        {
+            httpContext.Items["AuthFailureReason"] = "Token缺少设备标识，无法验证设备绑定";
+            httpContext.Items["AuthFailureCode"] = 40005;
+            context.Fail();
+            return;
+        }
+
+        if (!currentDeviceId.IsNullOrEmpty() && tokenDeviceId != currentDeviceId && !allowCrossDevice)
         {
             var userIdForLog = completeTokenInfo.UserId.IsNullOrEmpty() ? "未知" : completeTokenInfo.UserId;
-            SecurityLogger.LogDeviceIdMismatch(httpContext, tokenClientId, currentDeviceId, userIdForLog, new { Action = "TokenValidation", Method = "ResultHandle" });
+            SecurityLogger.LogDeviceIdMismatch(httpContext, tokenDeviceId, currentDeviceId, userIdForLog, new { Action = "TokenValidation", Method = "ResultHandle" });
             httpContext.Items["AuthFailureReason"] = "设备标识不匹配，Token无法在此设备使用";
             httpContext.Items["AuthFailureCode"] = 40005;
             context.Fail();
             return;
         }
-        else if (!currentDeviceId.IsNullOrEmpty() && !tokenClientId.IsNullOrEmpty() && tokenClientId != currentDeviceId && allowCrossDevice)
+        else if (!currentDeviceId.IsNullOrEmpty() && tokenDeviceId != currentDeviceId && allowCrossDevice)
         {
             var userIdForLog = completeTokenInfo.UserId.IsNullOrEmpty() ? "未知" : completeTokenInfo.UserId;
-            XTrace.WriteLine($"[开发模式] 允许跨设备Token验证: tokenClientId={tokenClientId}, currentDeviceId={currentDeviceId}, userId={userIdForLog}");
+            XTrace.WriteLine($"[开发模式] 允许跨设备Token验证: tokenDeviceId={tokenDeviceId}, currentDeviceId={currentDeviceId}, userId={userIdForLog}");
         }
 
         // 单设备登录验证（使用批量查询的结果）
         if (_options.SingleDeviceEnabled && completeTokenInfo.DeviceBindInfo != null && payload != null)
         {
-            var payloadDeviceId = payload["clientId"].SafeString();
+            var payloadDeviceId = payload.TryGetValue("deviceId", out var payloadDeviceIdObj) ? payloadDeviceIdObj.SafeString() : String.Empty;
+            if (payloadDeviceId.IsNullOrEmpty())
+            {
+                httpContext.Items["AuthFailureReason"] = "Token缺少设备标识，无法验证单设备登录";
+                httpContext.Items["AuthFailureCode"] = 40004;
+                context.Fail();
+                return;
+            }
+
             if (completeTokenInfo.DeviceBindInfo.DeviceId != payloadDeviceId)
             {
                 httpContext.Items["AuthFailureReason"] = "该账号已在其它设备登录";
@@ -276,6 +301,11 @@ public class JsonWebTokenAuthorizationHandler : AuthorizationHandler<JsonWebToke
         var isAuthenticated = httpContext.User.Identity?.IsAuthenticated == true;
         if (!isAuthenticated)
             return;
+
+        if (payload?.ContainsKey("deviceId") == true)
+        {
+            httpContext.Items["deviceId"] = payload["deviceId"];
+        }
 
         if (payload?.ContainsKey("clientId") == true)
         {

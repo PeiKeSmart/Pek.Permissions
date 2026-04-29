@@ -13,18 +13,18 @@ public static class SecurityLogger
     /// 记录设备ID不匹配的安全事件
     /// </summary>
     /// <param name="httpContext">HTTP上下文</param>
-    /// <param name="tokenClientId">Token中的ClientId</param>
+    /// <param name="tokenDeviceId">Token中的设备ID</param>
     /// <param name="currentDeviceId">当前设备ID</param>
     /// <param name="userId">用户ID</param>
     /// <param name="additionalInfo">附加信息</param>
-    public static void LogDeviceIdMismatch(HttpContext httpContext, string tokenClientId, string currentDeviceId, string userId, object additionalInfo = null)
+    public static void LogDeviceIdMismatch(HttpContext httpContext, string tokenDeviceId, string currentDeviceId, string userId, object additionalInfo = null)
     {
         var logData = new
         {
             EventType = "DeviceIdMismatch",
             Timestamp = DateTime.UtcNow,
             UserId = userId,
-            TokenClientId = tokenClientId,
+            TokenDeviceId = tokenDeviceId,
             CurrentDeviceId = currentDeviceId,
             ClientIP = GetClientIP(httpContext),
             UserAgent = httpContext?.Request?.Headers["User-Agent"].ToString(),
